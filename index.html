@@ -2,9 +2,55 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Arcade Hub — 30 Games</title>
-<link rel="icon" href="https://cdn-icons-png.flaticon.com/256/720/720284.png"/>
+
+<!-- ── PWA / HOME SCREEN ICONS ───────────────────────── -->
+<!-- Favicon -->
+<link rel="icon" type="image/png" sizes="256x256" href="https://cdn-icons-png.flaticon.com/256/720/720284.png"/>
+
+<!-- iOS / iPadOS: Add to Home Screen icon -->
+<link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/256/720/720284.png"/>
+<link rel="apple-touch-icon" sizes="152x152" href="https://cdn-icons-png.flaticon.com/256/720/720284.png"/>
+<link rel="apple-touch-icon" sizes="167x167" href="https://cdn-icons-png.flaticon.com/256/720/720284.png"/>
+<link rel="apple-touch-icon" sizes="180x180" href="https://cdn-icons-png.flaticon.com/256/720/720284.png"/>
+
+<!-- iOS full-screen web app -->
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="default"/>
+<meta name="apple-mobile-web-app-title" content="Arcade Hub"/>
+
+<!-- Android / Samsung / Chrome: Web App Manifest (inline as data URI so single-file works) -->
+<link rel="manifest" href="data:application/manifest+json,{
+  %22name%22:%22Arcade Hub%22,
+  %22short_name%22:%22ArcadeHub%22,
+  %22description%22:%2230 games in one app%22,
+  %22start_url%22:%22.%22,
+  %22display%22:%22standalone%22,
+  %22orientation%22:%22any%22,
+  %22background_color%22:%22%23f8f9fa%22,
+  %22theme_color%22:%221a73e8%22,
+  %22icons%22:[
+    {%22src%22:%22https://cdn-icons-png.flaticon.com/256/720/720284.png%22,%22sizes%22:%22256x256%22,%22type%22:%22image/png%22,%22purpose%22:%22any%20maskable%22}
+  ]
+}"/>
+
+<!-- Android Chrome theme colour (colours the browser bar / status bar) -->
+<meta name="theme-color" content="#1a73e8" media="(prefers-color-scheme: light)"/>
+<meta name="theme-color" content="#1a1a1a" media="(prefers-color-scheme: dark)"/>
+
+<!-- Microsoft Tiles (Edge / Windows) -->
+<meta name="msapplication-TileImage" content="https://cdn-icons-png.flaticon.com/256/720/720284.png"/>
+<meta name="msapplication-TileColor" content="#1a73e8"/>
+
+<!-- General SEO / share -->
+<meta name="application-name" content="Arcade Hub"/>
+<meta name="description" content="30 free games — Snake, Tetris, Chess, Wordle and more. Play in browser or install as an app."/>
+<meta property="og:title" content="Arcade Hub — 30 Games"/>
+<meta property="og:description" content="Snake, Tetris, Chess, Wordle and 27 more free games."/>
+<meta property="og:image" content="https://cdn-icons-png.flaticon.com/256/720/720284.png"/>
+<meta name="twitter:card" content="summary"/>
+
 <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -101,8 +147,12 @@ header{
 .gbtn .ic{font-size:18px;min-width:24px;text-align:center;display:flex;align-items:center;justify-content:center;}
 
 /* GAME AREA */
-.game-area{flex:1;display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative;background:var(--bg);}
-.gf{display:none;width:100%;height:100%;align-items:center;justify-content:center;flex-direction:column;}
+.game-area{flex:1;display:flex;align-items:stretch;justify-content:center;overflow:hidden;position:relative;background:var(--bg);}
+.gf{display:none;width:100%;height:100%;align-items:center;justify-content:flex-start;flex-direction:column;overflow-y:auto;overflow-x:hidden;padding:16px 8px;}
+/* Center content vertically only when it fits; scroll when it doesn't */
+.gf::before{content:'';flex:1;min-height:0;}
+.gf::after{content:'';flex:1;min-height:0;}
+.gf>*{flex-shrink:0;}
 .gf.active{display:flex;}
 
 /* HOME */
@@ -416,7 +466,9 @@ canvas{display:block;}
 .hr-tbtn.danger{color:#f28b82;border-color:rgba(242,139,130,.3);}
 .hr-tbtn.danger:hover{background:rgba(242,139,130,.12);}
 
-/* LOADING SCREEN */
+/* Home and htmlrunner are top-aligned scroll — disable the centering spacers */
+#home::before,#home::after,
+#htmlrunner-frame::before,#htmlrunner-frame::after{display:none;}
 #loading-screen{position:fixed;inset:0;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;z-index:9999;transition:opacity .4s;}
 #loading-screen.hide{opacity:0;pointer-events:none;}
 @media(prefers-color-scheme:dark){#loading-screen{background:#1f1f1f;}}
@@ -1119,7 +1171,7 @@ canvas{display:block;}
 </div>
 
 <!-- HTML RUNNER -->
-<div class="gf" id="htmlrunner-frame" style="gap:12px;padding:20px;flex-direction:column;align-items:center;">
+<div class="gf" id="htmlrunner-frame" style="gap:12px;padding:20px;flex-direction:column;align-items:center;justify-content:flex-start;overflow-y:auto;">
   <div class="gtitle">📁 HTML Runner</div>
   <p style="font-size:13px;color:var(--text2);text-align:center;">Upload any HTML file and run it here</p>
   <div class="upload-zone" id="upload-zone" onclick="document.getElementById('html-input').click()">
