@@ -479,9 +479,49 @@ canvas{display:block;}
 }
 .ripple-ink.light{background:rgba(255,255,255,.25);}
 [data-theme=dark] .ripple-ink:not(.light){background:rgba(255,255,255,.2);}
-/* overflow clip */
 .btn,.btn-fab,.gbtn,.cbtn,.hcard,.sidebar-toggle,.settings-btn,
 .settings-close,.theme-opt,.chip,.kkey,.hr-tbtn,.back-btn,.dbtn{overflow:hidden;}
+/* LOGGING */
+.log-toggle{display:flex;align-items:center;justify-content:space-between;padding:10px 0;}
+.toggle-switch{position:relative;width:44px;height:24px;flex-shrink:0;}
+.toggle-switch input{opacity:0;width:0;height:0;}
+.toggle-slider{position:absolute;inset:0;background:var(--border2);border-radius:12px;cursor:pointer;transition:background .2s;}
+.toggle-slider::before{content:'';position:absolute;width:18px;height:18px;left:3px;top:3px;background:#fff;border-radius:50%;transition:transform .2s;}
+.toggle-switch input:checked+.toggle-slider{background:var(--blue);}
+.toggle-switch input:checked+.toggle-slider::before{transform:translateX(20px);}
+.log-list{max-height:220px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--r8);font-size:12px;}
+.log-entry{display:flex;align-items:center;gap:8px;padding:7px 12px;border-bottom:1px solid var(--border);color:var(--text2);}
+.log-entry:last-child{border-bottom:none;}
+.log-badge{padding:2px 7px;border-radius:10px;font-size:10px;font-weight:600;flex-shrink:0;}
+.log-badge.win{background:var(--green-l);color:var(--green);}
+.log-badge.loss{background:var(--red-l);color:var(--red);}
+.log-badge.draw{background:var(--yellow-l);color:#b08c00;}
+.log-badge.info{background:var(--blue-l);color:var(--blue);}
+.log-game{font-weight:500;color:var(--text);flex-shrink:0;}
+.log-detail{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.log-time{font-size:10px;color:var(--text3);flex-shrink:0;}
+/* PWA SEARCH OVERLAY */
+#pwa-search-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:400;
+  display:none;align-items:flex-start;justify-content:center;padding-top:60px;
+}
+#pwa-search-overlay.open{display:flex;}
+.pwa-search-box{
+  background:var(--surface);border-radius:var(--r12);width:min(520px,92vw);
+  box-shadow:var(--shadow2);overflow:hidden;
+}
+.pwa-search-input-wrap{display:flex;align-items:center;padding:12px 16px;gap:10px;border-bottom:1px solid var(--border);}
+.pwa-search-input-wrap svg{color:var(--text3);flex-shrink:0;}
+#pwa-search-input{flex:1;border:none;outline:none;font-size:16px;font-family:'Google Sans',sans-serif;color:var(--text);background:transparent;}
+#pwa-search-input::placeholder{color:var(--text3);}
+.pwa-results{max-height:360px;overflow-y:auto;}
+.pwa-result{display:flex;align-items:center;gap:12px;padding:10px 16px;cursor:pointer;transition:background .1s;}
+.pwa-result:hover{background:var(--hover);}
+.pwa-result img{width:28px;height:28px;flex-shrink:0;}
+.pwa-result-name{font-size:14px;color:var(--text);}
+.pwa-result-cat{font-size:11px;color:var(--text3);}
+.pwa-empty{padding:20px;text-align:center;color:var(--text3);font-size:14px;}
+
 </style>
 </head>
 <body>
@@ -500,7 +540,7 @@ canvas{display:block;}
     <span class="logo-text">Arcade<span>Hub</span></span>
   </a>
   <div class="header-search">
-    <input type="text" placeholder="Search games..." id="search-input" oninput="filterGames(this.value)">
+    <input type="text" placeholder="Search games..." id="search-input" oninput="filterGames(this.value)" onfocus="handleSearchFocus()" autocomplete="off">
     <span class="search-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span>
   </div>
   <button class="back-btn" id="back-btn" onclick="loadGame('home')">← Menu</button>
@@ -539,7 +579,38 @@ canvas{display:block;}
           Toggle Sidebar
         </button>
       </div>
+      <div>
+        <div class="setting-group-title">Activity Log</div>
+        <div class="log-toggle">
+          <span style="font-size:13px;color:var(--text2);">Enable logging</span>
+          <label class="toggle-switch">
+            <input type="checkbox" id="log-toggle-cb" onchange="setLogging(this.checked)"/>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <div id="log-list-wrap">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <span style="font-size:12px;color:var(--text3);" id="log-count">No entries</span>
+            <button class="btn r" style="font-size:11px;padding:3px 10px;" onclick="clearLog()">Clear</button>
+          </div>
+          <div class="log-list" id="log-list"></div>
+        </div>
+      </div>
+    </div><!-- settings-body -->
+  </div><!-- settings-drawer -->
+</div><!-- settings-overlay -->
+
+<!-- PWA SEARCH OVERLAY -->
+<div id="pwa-search-overlay" onclick="closePwaSearch(event)">
+  <div class="pwa-search-box">
+    <div class="pwa-search-input-wrap">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input id="pwa-search-input" type="text" placeholder="Search games..." oninput="pwaSearch(this.value)" autocomplete="off"/>
+      <button class="settings-close" onclick="document.getElementById('pwa-search-overlay').classList.remove('open')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
     </div>
+    <div class="pwa-results" id="pwa-results"></div>
   </div>
 </div>
 
@@ -1121,6 +1192,7 @@ function filterGames(q){
       clearInterval(loop);running=false;
       const ov=document.getElementById('snake-ov');
       ov.innerHTML=`<h3>Game Over</h3><p>Score: ${score}</p><button class="btn-fab" onclick="snakeStart()">▶ Retry</button>`;
+      gameLog('Snake','Loss',`Score: ${score}`);
       ov.style.display='flex';return;
     }
     snake.unshift(head);
@@ -1188,7 +1260,7 @@ function filterGames(q){
   function rot(){const r=piece.s[0].map((_,i)=>piece.s.map(row=>row[i]).reverse());if(can(piece,0,0,r)){piece.s=r;drawBoard();}}
   function hd(){while(can(piece,0,1))piece.y++;lock();}
   function upd(){document.getElementById('tet-score').textContent=score;document.getElementById('tet-lines').textContent=lines;document.getElementById('tet-lvl').textContent=lvl;}
-  function go(){running=false;clearInterval(loop);const ov=document.getElementById('tetris-ov');ov.innerHTML=`<h3>Game Over</h3><p>Score: ${score}</p><button class="btn-fab" onclick="tetrisStart()">▶ Retry</button>`;ov.style.display='flex';}
+  function go(){running=false;clearInterval(loop);const ov=document.getElementById('tetris-ov');ov.innerHTML=`<h3>Game Over</h3><p>Score: ${score}</p><button class="btn-fab" onclick="tetrisStart()">▶ Retry</button>`;ov.style.display='flex';gameLog('Tetris','Loss',`Score: ${score}, Level: ${lvl}`);}
   function drawBoard(){
     const cv=document.getElementById('tetris-canvas');if(!cv)return;
     const ctx=cv.getContext('2d');
@@ -1276,6 +1348,7 @@ function filterGames(q){
     running=false;
     const ov=document.getElementById('flappy-ov');
     ov.innerHTML=`<h3>Game Over</h3><p>Score: ${score}</p><button class="btn-fab" onclick="flappyStart()">▶ Retry</button>`;
+    gameLog('Flappy Bird','Loss',`Score: ${score}`);
     ov.style.display='flex';
   }
 
@@ -1452,7 +1525,7 @@ function filterGames(q){
     }
     if(bricks.every(b=>!b.alive))over(true);
   }
-  function over(win){running=false;const ov=document.getElementById('breakout-ov');ov.innerHTML=`<h3>${win?'You Win! 🎉':'Game Over'}</h3><p>Score: ${score}</p><button class="btn-fab" onclick="breakoutStart()">▶ Retry</button>`;ov.style.display='flex';}
+  function over(win){running=false;const ov=document.getElementById('breakout-ov');ov.innerHTML=`<h3>${win?'You Win! 🎉':'Game Over'}</h3><p>Score: ${score}</p><button class="btn-fab" onclick="breakoutStart()">▶ Retry</button>`;ov.style.display='flex';gameLog('Breakout',win?'Win':'Loss',`Score: ${score}`);}
   function draw(){
     const cv=document.getElementById('breakout-canvas');if(!cv)return;
     const ctx=cv.getContext('2d');
@@ -1540,7 +1613,7 @@ function filterGames(q){
     if(ball.x>W+20){p.score++;scored();}
     document.getElementById('pong-p').textContent=p.score;
     document.getElementById('pong-b').textContent=bot.score;
-    if(p.score>=7||bot.score>=7){running=false;const ov=document.getElementById('pong-ov');ov.innerHTML=`<h3>${p.score>=7?'You Win! 🎉':'Bot Wins!'}</h3><p>${p.score} – ${bot.score}</p><button class="btn-fab" onclick="pongStart()">▶ Again</button>`;ov.style.display='flex';}
+    if(p.score>=7||bot.score>=7){running=false;const ov=document.getElementById('pong-ov');const win=p.score>=7;ov.innerHTML=`<h3>${win?'You Win! 🎉':'Bot Wins!'}</h3><p>${p.score} – ${bot.score}</p><button class="btn-fab" onclick="pongStart()">▶ Again</button>`;ov.style.display='flex';gameLog('Pong',win?'Win':'Loss',`${p.score} – ${bot.score}`);}
   }
   function scored(){lastTime=null;resetBall();}
   function draw(){
@@ -1601,7 +1674,7 @@ function filterGames(q){
     if(asteroids.length===0)for(let i=0;i<5+Math.floor(score/100);i++)spawnAst(45+Math.random()*20);
     if(ship.inv<=0){for(const a of asteroids){if(Math.hypot(ship.x-a.x,ship.y-a.y)<a.r+10){ship.inv=2;lives--;document.getElementById('ast-lives').textContent=lives;if(lives<=0){over();return;}break;}}}
   }
-  function over(){running=false;const ov=document.getElementById('ast-ov');ov.innerHTML=`<h3>Game Over</h3><p>Score: ${score}</p><button class="btn-fab" onclick="astStart()">▶ Retry</button>`;ov.style.display='flex';}
+  function over(){running=false;const ov=document.getElementById('ast-ov');ov.innerHTML=`<h3>Game Over</h3><p>Score: ${score}</p><button class="btn-fab" onclick="astStart()">▶ Retry</button>`;ov.style.display='flex';gameLog('Asteroids','Loss',`Score: ${score}`);}
   function draw(ts){
     const cv=document.getElementById('ast-canvas');if(!cv)return;
     const ctx=cv.getContext('2d');
@@ -1646,7 +1719,7 @@ function filterGames(q){
     if(height>best){best=Math.floor(height);document.getElementById('drop-best').textContent=best;}
     for(const p of platforms){
       if(player.y+player.r>p.y&&player.y-player.r<p.y+12&&player.vy>0){
-        if(!(player.x>p.gx&&player.x<p.gx+p.gw)){running=false;const ov=document.getElementById('dropper-ov');ov.innerHTML=`<h3>Splat!</h3><p>Fell: ${Math.floor(height)}m</p><button class="btn-fab" onclick="dropperStart()">▶ Retry</button>`;ov.style.display='flex';return;}
+        if(!(player.x>p.gx&&player.x<p.gx+p.gw)){running=false;const ov=document.getElementById('dropper-ov');ov.innerHTML=`<h3>Splat!</h3><p>Fell: ${Math.floor(height)}m</p><button class="btn-fab" onclick="dropperStart()">▶ Retry</button>`;ov.style.display='flex';gameLog('Dropper 3D','Loss',`Height: ${Math.floor(height)}m`);return;}
         else{player.y=p.y-player.r;player.vy*=.1;}
       }
     }
@@ -1724,7 +1797,7 @@ function filterGames(q){
     score=0;timeLeft=30;running=true;holes=Array(9).fill(0);renderHoles();upd();
     clearInterval(timer);clearInterval(gameTimer);
     timer=setInterval(popMole,700);
-    gameTimer=setInterval(()=>{timeLeft--;document.getElementById('wam-time').textContent=timeLeft;if(timeLeft<=0){clearInterval(timer);clearInterval(gameTimer);running=false;const ov=document.getElementById('wam-ov');ov.innerHTML=`<h3>Time up!</h3><p>Score: ${score}</p><button class="btn-fab" onclick="wamStart()">▶ Retry</button>`;ov.style.display='flex';}},1000);
+    gameTimer=setInterval(()=>{timeLeft--;document.getElementById('wam-time').textContent=timeLeft;if(timeLeft<=0){clearInterval(timer);clearInterval(gameTimer);running=false;const ov=document.getElementById('wam-ov');ov.innerHTML=`<h3>Time up!</h3><p>Score: ${score}</p><button class="btn-fab" onclick="wamStart()">▶ Retry</button>`;ov.style.display='flex';gameLog('Whack-a-Mole','Info',`Score: ${score}`);}},1000);
   }
   window.wamStart=wamStart;
   function popMole(){holes=holes.map(()=>0);const n=2+Math.floor(Math.random()*2);const idxs=[...Array(9).keys()].sort(()=>Math.random()-.5).slice(0,n);idxs.forEach((i,j)=>{holes[i]=j===0&&Math.random()<.25?2:1;});renderHoles();setTimeout(()=>{holes=holes.map(()=>0);renderHoles();},500);}
@@ -1794,52 +1867,192 @@ function filterGames(q){
   const INIT='rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR';
   let board,sel,turn,hist;
   const sq=(r,c)=>r*8+c;
-  function chessInit(){board=Array(64).fill(null);turn='w';sel=null;hist=[];let r=0,c=0;for(const ch of INIT){if(ch==='/'){{r++;c=0;}}else if(ch>='1'&&ch<='8')c+=+ch;else{board[sq(r,c)]=ch;c++;}}render();setSt('White to move');}
+  const isW=p=>p&&p===p.toUpperCase();
+  const isB=p=>p&&p!==p.toUpperCase();
+
+  function chessInit(){
+    board=Array(64).fill(null);turn='w';sel=null;hist=[];
+    let r=0,c=0;
+    for(const ch of INIT){
+      if(ch==='/'){r++;c=0;}
+      else if(ch>='1'&&ch<='8')c+=+ch;
+      else{board[sq(r,c)]=ch;c++;}
+    }
+    render();setSt('White to move');
+  }
   window.chessInit=chessInit;
-  window.chessUndo=function(){if(hist.length<2)return;hist.pop();const st=hist.pop();board=st.b;turn=st.t;sel=null;render();setSt(turn==='w'?'White to move':'Black to move');}
+  window.chessUndo=function(){
+    if(hist.length<2)return;
+    hist.pop();const st=hist.pop();
+    board=st.b;turn=st.t;sel=null;
+    render();setSt(turn==='w'?'White to move':'Black to move');
+  };
   function setSt(t){document.getElementById('chess-status').textContent=t;}
-  const isW=p=>p&&p===p.toUpperCase();const isB=p=>p&&p!==p.toUpperCase();
-  function getMoves(b,idx){
-    const p=b[idx];if(!p)return[];const r=Math.floor(idx/8),c=idx%8,mvs=[];
-    const push=(nr,nc)=>{if(nr>=0&&nr<8&&nc>=0&&nc<8){const t=b[sq(nr,nc)];if(!t||(isW(p)?isB(t):isW(t)))mvs.push(sq(nr,nc));}};
-    const slide=(dr,dc)=>{let nr=r+dr,nc=c+dc;while(nr>=0&&nr<8&&nc>=0&&nc<8){const t=b[sq(nr,nc)];if(t){if(isW(p)?isB(t):isW(t))mvs.push(sq(nr,nc));break;}mvs.push(sq(nr,nc));nr+=dr;nc+=dc;}};
+
+  // ATTACK SQUARES: squares a piece threatens (for check detection)
+  // Differs from move squares: pawn attacks diagonally, king attacks regardless of own-king safety
+  function getAttacks(b,idx){
+    const p=b[idx];if(!p)return[];
+    const r=Math.floor(idx/8),c=idx%8,atk=[];
+    const addSq=(nr,nc)=>{if(nr>=0&&nr<8&&nc>=0&&nc<8)atk.push(sq(nr,nc));};
+    const slide=(dr,dc)=>{let nr=r+dr,nc=c+dc;while(nr>=0&&nr<8&&nc>=0&&nc<8){atk.push(sq(nr,nc));if(b[sq(nr,nc)])break;nr+=dr;nc+=dc;}};
     const pt=p.toLowerCase();
-    if(pt==='p'){const dir=isW(p)?-1:1;if(r+dir>=0&&r+dir<8&&!b[sq(r+dir,c)])mvs.push(sq(r+dir,c));if((isW(p)&&r===6||isB(p)&&r===1)&&!b[sq(r+dir,c)]&&!b[sq(r+dir*2,c)])mvs.push(sq(r+dir*2,c));[c-1,c+1].forEach(nc=>{if(nc>=0&&nc<8){const t=b[sq(r+dir,nc)];if(t&&(isW(p)?isB(t):isW(t)))mvs.push(sq(r+dir,nc));}});}
-    if(pt==='n')[[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]].forEach(([dr,dc])=>push(r+dr,c+dc));
+    // Pawn attacks diagonally only
+    if(pt==='p'){const d=isW(p)?-1:1;[c-1,c+1].forEach(nc2=>{if(nc2>=0&&nc2<8&&r+d>=0&&r+d<8)atk.push(sq(r+d,nc2));});}
+    if(pt==='n')[[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]].forEach(([dr,dc])=>addSq(r+dr,c+dc));
     if(pt==='b'||pt==='q')[[1,1],[1,-1],[-1,1],[-1,-1]].forEach(([dr,dc])=>slide(dr,dc));
     if(pt==='r'||pt==='q')[[1,0],[-1,0],[0,1],[0,-1]].forEach(([dr,dc])=>slide(dr,dc));
-    if(pt==='k')[[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]].forEach(([dr,dc])=>push(r+dr,c+dc));
+    if(pt==='k')[[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]].forEach(([dr,dc])=>addSq(r+dr,c+dc));
+    return atk;
+  }
+
+  // PSEUDO-LEGAL MOVES: piece can go here if we ignore check
+  function getMoves(b,idx){
+    const p=b[idx];if(!p)return[];
+    const r=Math.floor(idx/8),c=idx%8,mvs=[];
+    const canLand=(nr,nc)=>{
+      if(nr<0||nr>=8||nc<0||nc>=8)return false;
+      const t=b[sq(nr,nc)];
+      return !t||(isW(p)?isB(t):isW(t));
+    };
+    const slide=(dr,dc)=>{let nr=r+dr,nc=c+dc;while(nr>=0&&nr<8&&nc>=0&&nc<8){const t=b[sq(nr,nc)];if(t){if(isW(p)?isB(t):isW(t))mvs.push(sq(nr,nc));break;}mvs.push(sq(nr,nc));nr+=dr;nc+=dc;}};
+    const pt=p.toLowerCase();
+    if(pt==='p'){
+      const d=isW(p)?-1:1;
+      if(r+d>=0&&r+d<8&&!b[sq(r+d,c)])mvs.push(sq(r+d,c));
+      if((isW(p)&&r===6||isB(p)&&r===1)&&!b[sq(r+d,c)]&&!b[sq(r+d*2,c)])mvs.push(sq(r+d*2,c));
+      [c-1,c+1].forEach(nc2=>{if(nc2>=0&&nc2<8&&r+d>=0&&r+d<8){const t=b[sq(r+d,nc2)];if(t&&(isW(p)?isB(t):isW(t)))mvs.push(sq(r+d,nc2));}});
+    }
+    if(pt==='n')[[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]].forEach(([dr,dc])=>{if(canLand(r+dr,c+dc))mvs.push(sq(r+dr,c+dc));});
+    if(pt==='b'||pt==='q')[[1,1],[1,-1],[-1,1],[-1,-1]].forEach(([dr,dc])=>slide(dr,dc));
+    if(pt==='r'||pt==='q')[[1,0],[-1,0],[0,1],[0,-1]].forEach(([dr,dc])=>slide(dr,dc));
+    if(pt==='k')[[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]].forEach(([dr,dc])=>{if(canLand(r+dr,c+dc))mvs.push(sq(r+dr,c+dc));});
     return mvs;
   }
+
+  // IS IN CHECK: uses getAttacks so pawn checks are diagonal-only, king attacks don't recurse
+  function isInCheck(b,white){
+    const king=white?'K':'k';
+    const kIdx=b.indexOf(king);
+    if(kIdx<0)return false;
+    for(let i=0;i<64;i++){
+      const p=b[i];
+      if(!p||( white?isW(p):isB(p)))continue;// skip empty + same color
+      if(getAttacks(b,i).includes(kIdx))return true;
+    }
+    return false;
+  }
+
+  // LEGAL MOVES: filter pseudo-legal, remove moves that leave own king in check
+  function getLegalMoves(b,idx){
+    const p=b[idx];if(!p)return[];
+    const white=isW(p);
+    return getMoves(b,idx).filter(to=>{
+      const nb=[...b];nb[to]=nb[idx];nb[idx]=null;
+      return !isInCheck(nb,white);
+    });
+  }
+
+  // Any legal move exists for this side?
+  function hasLegalMoves(b,white){
+    for(let i=0;i<64;i++){
+      const p=b[i];
+      if(!p||(white?!isW(p):!isB(p)))continue;
+      if(getLegalMoves(b,i).length>0)return true;
+    }
+    return false;
+  }
+
+  function mkMv(b,fr,to){b[to]=b[fr];b[fr]=null;}
+
+  // Returns end-state message or null if game continues
+  function checkEnd(b,whiteTurn){
+    const inChk=isInCheck(b,whiteTurn);
+    const hasMvs=hasLegalMoves(b,whiteTurn);
+    if(!hasMvs){
+      if(inChk)return whiteTurn?'Checkmate — Bot wins! 👑':'Checkmate — You win! 👑';
+      return 'Stalemate — Draw 🤝';
+    }
+    if(inChk)return whiteTurn?'Check — watch your king! ⚠️':'Black is in check!';
+    return null;
+  }
+
   function clickSq(idx){
     if(turn!=='w')return;
-    if(sel===null){if(board[idx]&&isW(board[idx])){sel=idx;render();}}
-    else{
-      const mvs=getMoves(board,sel);
-      if(mvs.includes(idx)){hist.push({b:[...board],t:turn});mkMv(board,sel,idx);if(board[idx]==='P'&&Math.floor(idx/8)===0)board[idx]='Q';if(!board.includes('k')){turn='done';sel=null;render();setSt('You win! 👑');return;}turn='b';sel=null;render();setSt('Bot thinking...');setTimeout(botMv,400);}
-      else if(board[idx]&&isW(board[idx])){sel=idx;render();}
-      else{sel=null;render();}
+    if(sel===null){
+      if(board[idx]&&isW(board[idx])){sel=idx;render();}
+    } else {
+      const mvs=getLegalMoves(board,sel);
+      if(mvs.includes(idx)){
+        hist.push({b:[...board],t:turn});
+        mkMv(board,sel,idx);
+        if(board[idx]==='P'&&Math.floor(idx/8)===0)board[idx]='Q';
+        sel=null;
+        if(!board.includes('k')){turn='done';render();setSt('You win! 👑');gameLog('Chess','Win','King captured');return;}
+        const end=checkEnd(board,false);
+        if(end&&(end.includes('Checkmate')||end.includes('Stalemate'))){
+          turn='done';render();setSt(end);
+          gameLog('Chess',end.includes('You win')?'Win':'Draw',end);
+          return;
+        }
+        turn='b';render();setSt(end||'Bot thinking...');
+        setTimeout(botMv,420);
+      } else if(board[idx]&&isW(board[idx])){
+        sel=idx;render();
+      } else {
+        sel=null;render();
+      }
     }
   }
-  function mkMv(b,fr,to){b[to]=b[fr];b[fr]=null;}
+
   function botMv(){
     if(turn==='done')return;
-    const vals={p:1,n:3,b:3,r:5,q:9,k:100};let best=-999,bf=-1,bt=-1;
-    for(let i=0;i<64;i++){if(!board[i]||!isB(board[i]))continue;getMoves(board,i).forEach(to=>{const cap=board[to];let sc=cap?vals[cap.toLowerCase()]:0;sc+=Math.random()*.5;if(sc>best){best=sc;bf=i;bt=to;}});}
-    if(bf<0){turn='done';setSt('Stalemate');render();return;}
-    hist.push({b:[...board],t:turn});mkMv(board,bf,bt);if(board[bt]==='p'&&Math.floor(bt/8)===7)board[bt]='q';
-    if(!board.includes('K')){turn='done';render();setSt('Checkmate — Bot wins!');return;}
-    turn='w';render();setSt('White to move');
+    // Simple material-based bot using legal moves only
+    const vals={p:1,n:3,b:3,r:5,q:9,k:100};
+    let bestScore=-9999,bf=-1,bt=-1;
+    for(let i=0;i<64;i++){
+      if(!board[i]||!isB(board[i]))continue;
+      getLegalMoves(board,i).forEach(to=>{
+        let sc=(board[to]?vals[board[to].toLowerCase()]:0)+Math.random()*0.4;
+        // Bonus: put white in check
+        const nb=[...board];nb[to]=nb[i];nb[i]=null;
+        if(isInCheck(nb,true))sc+=0.5;
+        if(sc>bestScore){bestScore=sc;bf=i;bt=to;}
+      });
+    }
+    if(bf<0){
+      const end=checkEnd(board,false);
+      turn='done';render();
+      setSt(end||'Stalemate — Draw 🤝');
+      gameLog('Chess',end?.includes('You win')?'Win':'Draw',end||'Stalemate');
+      return;
+    }
+    hist.push({b:[...board],t:turn});
+    mkMv(board,bf,bt);
+    if(board[bt]==='p'&&Math.floor(bt/8)===7)board[bt]='q';
+    if(!board.includes('K')){turn='done';render();setSt('Checkmate — Bot wins! 👑');gameLog('Chess','Loss','King captured');return;}
+    const end=checkEnd(board,true);
+    if(end&&(end.includes('Checkmate')||end.includes('Stalemate'))){
+      turn='done';render();setSt(end);
+      gameLog('Chess',end.includes('You win')?'Win':end.includes('Stalemate')?'Draw':'Loss',end);
+      return;
+    }
+    turn='w';render();setSt(end||'White to move');
   }
+
   function render(){
-    const el=document.getElementById('chess-board');if(!el)return;el.innerHTML='';
-    const moves=sel!==null?getMoves(board,sel):[];
+    const el=document.getElementById('chess-board');if(!el)return;
+    el.innerHTML='';
+    const legalMvs=sel!==null?getLegalMoves(board,sel):[];
+    const wkIdx=board.indexOf('K');
+    const inChk=turn==='w'&&isInCheck(board,true);
     for(let i=0;i<64;i++){
       const r=Math.floor(i/8),c=i%8;
       const d=document.createElement('div');
       d.className='csq '+((r+c)%2===0?'light':'dark');
       if(sel===i)d.classList.add('sel');
-      if(moves.includes(i))d.classList.add('poss');
+      if(legalMvs.includes(i))d.classList.add('poss');
+      if(inChk&&i===wkIdx)d.style.background='#ff4444';
       const p=board[i];
       if(p){
         const span=document.createElement('span');
@@ -2523,7 +2736,159 @@ window.loadGame=function(id){closeMobileSidebar();_lgWrap(id);};
   document.addEventListener('touchcancel',release,{passive:true});
 })();
 
-// ── LOADING SCREEN ───────────────────────────────────
+// ── ACTIVITY LOG ─────────────────────────────────────
+let _logEnabled=false;
+let _logEntries=[];
+const LOG_MAX=200;
+
+function setLogging(enabled){
+  _logEnabled=enabled;
+  try{localStorage.setItem('arcade-log-enabled',enabled?'1':'0');}catch(e){}
+  renderLog();
+}
+window.setLogging=setLogging;
+
+function gameLog(game,result,detail=''){
+  if(!_logEnabled)return;
+  const now=new Date();
+  const time=now.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+  _logEntries.unshift({game,result,detail,time,date:now.toLocaleDateString()});
+  if(_logEntries.length>LOG_MAX)_logEntries.length=LOG_MAX;
+  try{localStorage.setItem('arcade-log',JSON.stringify(_logEntries));}catch(e){}
+  renderLog();
+}
+window.gameLog=gameLog;
+
+function clearLog(){
+  _logEntries=[];
+  try{localStorage.removeItem('arcade-log');}catch(e){}
+  renderLog();
+}
+window.clearLog=clearLog;
+
+function renderLog(){
+  const list=document.getElementById('log-list');
+  const count=document.getElementById('log-count');
+  if(!list||!count)return;
+  if(_logEntries.length===0){
+    count.textContent=_logEnabled?'No entries yet':'Logging disabled';
+    list.innerHTML='<div class="pwa-empty" style="padding:12px;">'+(_logEnabled?'Play some games!':'Enable logging above')+'</div>';
+    return;
+  }
+  count.textContent=`${_logEntries.length} entr${_logEntries.length===1?'y':'ies'}`;
+  list.innerHTML=_logEntries.slice(0,50).map(e=>{
+    const r=e.result.toLowerCase();
+    const badge=r.includes('win')?'win':r.includes('loss')||r.includes('lose')?'loss':r.includes('draw')||r.includes('stale')?'draw':'info';
+    return `<div class="log-entry">
+      <span class="log-badge ${badge}">${e.result}</span>
+      <span class="log-game">${e.game}</span>
+      <span class="log-detail">${e.detail||''}</span>
+      <span class="log-time">${e.time}</span>
+    </div>`;
+  }).join('');
+}
+
+// Restore log state
+(function(){
+  try{
+    const en=localStorage.getItem('arcade-log-enabled');
+    if(en==='1'){_logEnabled=true;const cb=document.getElementById('log-toggle-cb');if(cb)cb.checked=true;}
+    const saved=localStorage.getItem('arcade-log');
+    if(saved)_logEntries=JSON.parse(saved);
+  }catch(e){}
+  renderLog();
+})();
+
+// ── PWA DETECTION + SEARCH ────────────────────────────
+const isPWA=()=>window.matchMedia('(display-mode: standalone)').matches||window.navigator.standalone===true;
+
+// Game catalog for PWA search
+const GAME_CATALOG=[
+  {id:'snake',name:'Snake',cat:'Arcade',icon:'1f40d'},
+  {id:'tetris',name:'Tetris',cat:'Arcade',icon:'1f7e6'},
+  {id:'flappy',name:'Flappy Bird',cat:'Arcade',icon:'1f426'},
+  {id:'breakout',name:'Breakout',cat:'Arcade',icon:'1f9f1'},
+  {id:'pong',name:'Pong',cat:'Arcade',icon:'1f3d3'},
+  {id:'asteroids',name:'Asteroids',cat:'Arcade',icon:'1f680'},
+  {id:'dropper',name:'Dropper 3D',cat:'Arcade',icon:'1f300'},
+  {id:'platformer',name:'Platformer',cat:'Arcade',icon:'1f3c3'},
+  {id:'wam',name:'Whack-a-Mole',cat:'Arcade',icon:'1f528'},
+  {id:'clicker',name:'Cookie Clicker',cat:'Arcade',icon:'1f36a'},
+  {id:'ttt',name:'Tic-Tac-Toe',cat:'Puzzle',icon:'274c'},
+  {id:'chess',name:'Chess vs Bot',cat:'Puzzle',icon:'265f'},
+  {id:'connect4',name:'Connect Four',cat:'Puzzle',icon:'1f534'},
+  {id:'g2048',name:'2048',cat:'Puzzle',icon:'1f522'},
+  {id:'minesweeper',name:'Minesweeper',cat:'Puzzle',icon:'1f4a3'},
+  {id:'sudoku',name:'Sudoku',cat:'Puzzle',icon:'1f537'},
+  {id:'hanoi',name:'Tower of Hanoi',cat:'Puzzle',icon:'1f5fc'},
+  {id:'memory',name:'Memory Match',cat:'Puzzle',icon:'1f0cf'},
+  {id:'wordle',name:'Wordle',cat:'Word & Brain',icon:'1f4dd'},
+  {id:'hangman',name:'Hangman',cat:'Word & Brain',icon:'1faa2'},
+  {id:'typing',name:'Typing Test',cat:'Word & Brain',icon:'2328'},
+  {id:'numguess',name:'Number Guess',cat:'Word & Brain',icon:'1f522'},
+  {id:'colormatch',name:'Color Match',cat:'Word & Brain',icon:'1f3a8'},
+  {id:'simon',name:'Simon Says',cat:'Word & Brain',icon:'1f3b5'},
+  {id:'reaction',name:'Reaction Time',cat:'Tools',icon:'26a1'},
+  {id:'dice',name:'Dice Roller',cat:'Tools',icon:'1f3b2'},
+  {id:'calculator',name:'Calculator',cat:'Tools',icon:'1f9ee'},
+  {id:'stopwatch',name:'Stopwatch',cat:'Tools',icon:'23f1'},
+  {id:'soundboard',name:'Soundboard',cat:'Tools',icon:'1f3b9'},
+  {id:'htmlrunner',name:'HTML Runner',cat:'Tools',icon:'1f4c1'},
+];
+
+function handleSearchFocus(){
+  if(isPWA()){
+    // In PWA mode: blur the header input and open the overlay search instead
+    document.getElementById('search-input').blur();
+    openPwaSearch();
+  }
+}
+window.handleSearchFocus=handleSearchFocus;
+
+function openPwaSearch(){
+  const overlay=document.getElementById('pwa-search-overlay');
+  overlay.classList.add('open');
+  const input=document.getElementById('pwa-search-input');
+  input.value='';
+  pwaSearch('');
+  requestAnimationFrame(()=>input.focus());
+}
+window.openPwaSearch=openPwaSearch;
+
+function closePwaSearch(e){
+  if(e&&e.target!==document.getElementById('pwa-search-overlay'))return;
+  document.getElementById('pwa-search-overlay').classList.remove('open');
+}
+window.closePwaSearch=closePwaSearch;
+
+function pwaSearch(q){
+  q=q.toLowerCase().trim();
+  const results=q?GAME_CATALOG.filter(g=>g.name.toLowerCase().includes(q)||g.cat.toLowerCase().includes(q)):GAME_CATALOG;
+  const container=document.getElementById('pwa-results');
+  if(!results.length){
+    container.innerHTML='<div class="pwa-empty">No games found</div>';
+    return;
+  }
+  container.innerHTML=results.map(g=>`
+    <div class="pwa-result" onclick="document.getElementById('pwa-search-overlay').classList.remove('open');loadGame('${g.id}')">
+      <img src="https://cdn.jsdelivr.net/gh/twitter/twemoji@14/assets/svg/${g.icon}.svg" width="28" height="28"/>
+      <div><div class="pwa-result-name">${g.name}</div><div class="pwa-result-cat">${g.cat}</div></div>
+    </div>`).join('');
+}
+window.pwaSearch=pwaSearch;
+
+// Keyboard shortcut: Ctrl/Cmd+K opens search
+document.addEventListener('keydown',e=>{
+  if((e.ctrlKey||e.metaKey)&&e.key==='k'){e.preventDefault();openPwaSearch();}
+  if(e.key==='Escape')document.getElementById('pwa-search-overlay').classList.remove('open');
+});
+
+// Also hook existing filterGames to also work normally on home screen
+const _origFilterGames=window.filterGames;
+window.filterGames=function(q){
+  if(isPWA()&&q){openPwaSearch();document.getElementById('pwa-search-input').value=q;pwaSearch(q);}
+  else{_origFilterGames&&_origFilterGames(q);}
+};
 (function(){
   const ls=document.getElementById('loading-screen');
   function hideLs(){ls.classList.add('hide');setTimeout(()=>ls.style.display='none',450);}
