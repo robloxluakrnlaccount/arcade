@@ -483,6 +483,28 @@ canvas{display:block;}
 .csq .wp{color:#fff;text-shadow:0 0 2px #000,0 1px 3px rgba(0,0,0,.8);}
 .csq .bp{color:#1a1a1a;text-shadow:0 0 2px rgba(255,255,255,.6),0 1px 2px rgba(255,255,255,.4);}
 
+/* PAWN PROMOTION PICKER */
+#promo-overlay{
+  position:absolute;inset:0;background:rgba(0,0,0,.65);
+  display:none;align-items:center;justify-content:center;
+  z-index:50;border-radius:var(--r12);
+}
+#promo-overlay.show{display:flex;}
+.promo-box{
+  background:var(--surface);border-radius:var(--r12);
+  padding:16px 20px;display:flex;flex-direction:column;
+  align-items:center;gap:12px;box-shadow:var(--shadow2);
+}
+.promo-box p{font-size:13px;font-weight:500;color:var(--text2);}
+.promo-pieces{display:flex;gap:8px;}
+.promo-piece{
+  width:58px;height:58px;border-radius:var(--r8);
+  border:2px solid var(--border2);background:var(--hover);
+  display:flex;align-items:center;justify-content:center;
+  font-size:32px;cursor:pointer;transition:all .15s;
+}
+.promo-piece:hover{border-color:var(--blue);background:var(--active);transform:scale(1.08);}
+
 /* ── MOBILE ─────────────────────────────────────────── */
 @media(max-width:600px){
   .ttt-grid{grid-template-columns:repeat(3,66px);grid-template-rows:repeat(3,66px);}
@@ -923,6 +945,17 @@ canvas{display:block;}
     <div class="gtitle">♟️ Chess vs Bot</div>
     <div class="sbar" id="chess-status">White to move</div>
     <div id="chess-board"></div>
+    <div id="promo-overlay">
+      <div class="promo-box">
+        <p>Promote pawn to:</p>
+        <div class="promo-pieces">
+          <div class="promo-piece" id="promo-Q" onclick="choosePromo('Q')" title="Queen"></div>
+          <div class="promo-piece" id="promo-R" onclick="choosePromo('R')" title="Rook"></div>
+          <div class="promo-piece" id="promo-B" onclick="choosePromo('B')" title="Bishop"></div>
+          <div class="promo-piece" id="promo-N" onclick="choosePromo('N')" title="Knight"></div>
+        </div>
+      </div>
+    </div>
     <div style="display:flex;gap:6px;margin-top:6px">
       <button class="btn" onclick="chessInit()">↺ New game</button>
       <button class="btn" onclick="chessUndo()">⟵ Undo</button>
@@ -2033,6 +2066,46 @@ function filterGames(q){
     return null;
   }
 
+  // Promotion state
+  let _promoCallback=null;
+  const PROMO_UNI_W={Q:'♕',R:'♖',B:'♗',N:'♘'};
+  const PROMO_UNI_B={q:'♛',r:'♜',b:'♝',n:'♞'};
+
+  function showPromo(white, cb){
+    const ov=document.getElementById('promo-overlay');
+    const pieces=white?PROMO_UNI_W:PROMO_UNI_B;
+    // Fill icons — always show white glyphs for player, black for bot
+    ['Q','R','B','N'].forEach(p=>{
+      const key=white?p:p.toLowerCase();
+      const el=document.getElementById('promo-'+p);
+      if(el){
+        el.innerHTML=`<span class="${white?'wp':'bp'}">${pieces[key]||PROMO_UNI_W[p]}</span>`;
+        el.style.cssText=white?'':'';
+      }
+    });
+    ov.classList.add('show');
+    _promoCallback=cb;
+  }
+
+  window.choosePromo=function(piece){
+    const ov=document.getElementById('promo-overlay');
+    ov.classList.remove('show');
+    if(_promoCallback){_promoCallback(piece);_promoCallback=null;}
+  };
+
+  function afterPlayerMove(fromIdx,toIdx){
+    sel=null;
+    if(!board.includes('k')){turn='done';render();setSt('You win! 👑');gameLog('Chess','Win','King captured');return;}
+    const end=checkEnd(board,false);
+    if(end&&(end.includes('Checkmate')||end.includes('Stalemate'))){
+      turn='done';render();setSt(end);
+      gameLog('Chess',end.includes('You win')?'Win':'Draw',end);
+      return;
+    }
+    turn='b';render();setSt(end||'Bot thinking...');
+    setTimeout(botMv,420);
+  }
+
   function clickSq(idx){
     if(turn!=='w')return;
     if(sel===null){
@@ -2042,17 +2115,17 @@ function filterGames(q){
       if(mvs.includes(idx)){
         hist.push({b:[...board],t:turn});
         mkMv(board,sel,idx);
-        if(board[idx]==='P'&&Math.floor(idx/8)===0)board[idx]='Q';
-        sel=null;
-        if(!board.includes('k')){turn='done';render();setSt('You win! 👑');gameLog('Chess','Win','King captured');return;}
-        const end=checkEnd(board,false);
-        if(end&&(end.includes('Checkmate')||end.includes('Stalemate'))){
-          turn='done';render();setSt(end);
-          gameLog('Chess',end.includes('You win')?'Win':'Draw',end);
-          return;
+        const isPromo=board[idx]==='P'&&Math.floor(idx/8)===0;
+        if(isPromo){
+          render();
+          // Show picker and wait
+          showPromo(true,(piece)=>{
+            board[idx]=piece;
+            afterPlayerMove(sel,idx);
+          });
+        } else {
+          afterPlayerMove(sel,idx);
         }
-        turn='b';render();setSt(end||'Bot thinking...');
-        setTimeout(botMv,420);
       } else if(board[idx]&&isW(board[idx])){
         sel=idx;render();
       } else {
@@ -2063,14 +2136,12 @@ function filterGames(q){
 
   function botMv(){
     if(turn==='done')return;
-    // Simple material-based bot using legal moves only
     const vals={p:1,n:3,b:3,r:5,q:9,k:100};
     let bestScore=-9999,bf=-1,bt=-1;
     for(let i=0;i<64;i++){
       if(!board[i]||!isB(board[i]))continue;
       getLegalMoves(board,i).forEach(to=>{
         let sc=(board[to]?vals[board[to].toLowerCase()]:0)+Math.random()*0.4;
-        // Bonus: put white in check
         const nb=[...board];nb[to]=nb[i];nb[i]=null;
         if(isInCheck(nb,true))sc+=0.5;
         if(sc>bestScore){bestScore=sc;bf=i;bt=to;}
@@ -2085,6 +2156,7 @@ function filterGames(q){
     }
     hist.push({b:[...board],t:turn});
     mkMv(board,bf,bt);
+    // Bot always promotes to queen (optimal)
     if(board[bt]==='p'&&Math.floor(bt/8)===7)board[bt]='q';
     if(!board.includes('K')){turn='done';render();setSt('Checkmate — Bot wins! 👑');gameLog('Chess','Loss','King captured');return;}
     const end=checkEnd(board,true);
