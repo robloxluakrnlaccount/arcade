@@ -28,10 +28,11 @@
   %22start_url%22:%22.%22,
   %22display%22:%22standalone%22,
   %22orientation%22:%22any%22,
-  %22background_color%22:%22%23f8f9fa%22,
+  %22background_color%22:%22%23ffffff%22,
   %22theme_color%22:%221a73e8%22,
   %22icons%22:[
-    {%22src%22:%22https://cdn-icons-png.flaticon.com/256/720/720284.png%22,%22sizes%22:%22256x256%22,%22type%22:%22image/png%22,%22purpose%22:%22any%20maskable%22}
+    {%22src%22:%22https://cdn-icons-png.flaticon.com/256/720/720284.png%22,%22sizes%22:%22256x256%22,%22type%22:%22image/png%22,%22purpose%22:%22any%22},
+    {%22src%22:%22https://cdn-icons-png.flaticon.com/256/720/720284.png%22,%22sizes%22:%22256x256%22,%22type%22:%22image/png%22,%22purpose%22:%22maskable%22}
   ]
 }"/>
 
@@ -145,6 +146,14 @@ header{
 .gbtn:hover{background:var(--hover);color:var(--text);}
 .gbtn.active{background:var(--active);color:var(--blue);}
 .gbtn .ic{font-size:18px;min-width:24px;text-align:center;display:flex;align-items:center;justify-content:center;}
+
+/* PWA MODE: icon-only compact sidebar */
+body.pwa .sidebar{width:64px;min-width:64px;}
+body.pwa .sidebar-section{display:none;}
+body.pwa .gbtn{justify-content:center;padding:10px 0;gap:0;border-radius:50%;width:44px;height:44px;margin:2px auto;}
+body.pwa .gbtn span:not(.ic){display:none;}
+body.pwa .gbtn .ic img{width:24px;height:24px;}
+body.pwa .gbtn .ic{min-width:0;font-size:20px;}
 
 /* GAME AREA */
 .game-area{flex:1;display:flex;align-items:stretch;justify-content:center;overflow:hidden;position:relative;background:var(--bg);}
@@ -2851,8 +2860,16 @@ function renderLog(){
   renderLog();
 })();
 
-// ── PWA DETECTION + SEARCH ────────────────────────────
+// ── PWA DETECTION ────────────────────────────────────
+// Run immediately so sidebar shrinks before first render, no flash
 const isPWA=()=>window.matchMedia('(display-mode: standalone)').matches||window.navigator.standalone===true;
+(function applyPWAClass(){
+  if(isPWA())document.body.classList.add('pwa');
+  // Also listen for if user installs while page is open
+  window.matchMedia('(display-mode: standalone)').addEventListener('change',e=>{
+    document.body.classList.toggle('pwa',e.matches);
+  });
+})();
 
 // Game catalog for PWA search
 const GAME_CATALOG=[
