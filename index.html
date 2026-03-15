@@ -154,6 +154,9 @@ body.pwa .gbtn{justify-content:center;padding:10px 0;gap:0;border-radius:50%;wid
 body.pwa .gbtn span:not(.ic){display:none;}
 body.pwa .gbtn .ic img{width:24px;height:24px;}
 body.pwa .gbtn .ic{min-width:0;font-size:20px;}
+/* PWA: shrink the hamburger toggle button and its icon */
+body.pwa .sidebar-toggle{width:32px;height:32px;}
+body.pwa .sidebar-toggle svg{width:16px;height:16px;}
 
 /* GAME AREA */
 .game-area{flex:1;display:flex;align-items:stretch;justify-content:center;overflow:hidden;position:relative;background:var(--bg);}
@@ -592,7 +595,7 @@ canvas{display:block;}
 </div>
 <header>
   <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Toggle sidebar">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
   </button>
   <a class="header-logo" href="#" onclick="loadGame('home');return false;">
     <div class="logo-icon">
