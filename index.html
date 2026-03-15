@@ -473,6 +473,25 @@ canvas{display:block;}
 /* Home and htmlrunner are top-aligned scroll — disable the centering spacers */
 #home::before,#home::after,
 #htmlrunner-frame::before,#htmlrunner-frame::after{display:none;}
+
+/* ── TOUCH CONTROLS ─────────────────────────────────── */
+.touch-controls{display:none;gap:8px;align-items:center;justify-content:center;flex-wrap:wrap;margin-top:4px;}
+body.touch .touch-controls{display:flex;}
+body.touch .hint-keyboard{display:none;}
+.tc-row{display:flex;gap:6px;align-items:center;justify-content:center;}
+.tc-btn{
+  width:52px;height:52px;border-radius:var(--r8);border:1px solid var(--border2);
+  background:var(--hover);display:flex;align-items:center;justify-content:center;
+  font-size:22px;cursor:pointer;user-select:none;-webkit-user-select:none;
+  transition:background .08s,transform .08s;color:var(--text);font-weight:600;
+}
+.tc-btn:active,.tc-btn.pressed{background:var(--active);border-color:var(--blue);transform:scale(.9);}
+.tc-btn.wide{width:80px;}
+.tc-btn.tc-shoot{background:var(--red-l);border-color:var(--red);color:var(--red);}
+.tc-btn.tc-shoot.pressed,.tc-btn.tc-shoot:active{background:var(--red);color:#fff;}
+.tc-btn.tc-jump{background:var(--green-l);border-color:var(--green);color:var(--green);}
+.tc-btn.tc-jump.pressed,.tc-btn.tc-jump:active{background:var(--green);color:#fff;}
+
 #loading-screen{position:fixed;inset:0;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;z-index:9999;transition:opacity .4s;}
 #loading-screen.hide{opacity:0;pointer-events:none;}
 @media(prefers-color-scheme:dark){#loading-screen{background:#1f1f1f;}}
@@ -813,7 +832,15 @@ canvas{display:block;}
     <div class="gtitle">🐍 Snake</div>
     <div class="sbar">Score: <span id="sn-score">0</span>&nbsp;&nbsp;Best: <span id="sn-best">0</span></div>
     <canvas id="snake-canvas" width="360" height="360" style="border-radius:var(--r8);border:1px solid var(--border);"></canvas>
-    <div class="hint">WASD / Arrows · Swipe on mobile</div>
+    <div class="hint hint-keyboard">WASD / Arrows · Swipe on mobile</div>
+    <div class="touch-controls" id="snake-tc">
+      <div class="tc-row"><div class="tc-btn" id="snk-up" ontouchstart="snkBtn('up',true)" ontouchend="snkBtn('up',false)">↑</div></div>
+      <div class="tc-row">
+        <div class="tc-btn" id="snk-left" ontouchstart="snkBtn('left',true)" ontouchend="snkBtn('left',false)">←</div>
+        <div class="tc-btn" id="snk-down" ontouchstart="snkBtn('down',true)" ontouchend="snkBtn('down',false)">↓</div>
+        <div class="tc-btn" id="snk-right" ontouchstart="snkBtn('right',true)" ontouchend="snkBtn('right',false)">→</div>
+      </div>
+    </div>
     <div class="overlay" id="snake-ov"><h3>🐍 Snake</h3><p>WASD or Arrow Keys</p><button class="btn-fab" onclick="snakeStart()">▶ Start</button></div>
   </div>
 </div>
@@ -823,12 +850,23 @@ canvas{display:block;}
   <div class="gc">
     <div class="gtitle">🟦 Tetris</div>
     <div class="sbar">Score: <span id="tet-score">0</span>&nbsp;Lines: <span id="tet-lines">0</span>&nbsp;Level: <span id="tet-lvl">1</span></div>
-    <div class="tet-layout">
-      <canvas id="tetris-canvas" width="200" height="400" style="border-radius:var(--r4);"></canvas>
-      <div class="tet-side"><div>Next</div><canvas id="tetris-next" width="80" height="80" style="border:1px solid var(--border);border-radius:var(--r4);"></canvas>
-        <div style="margin-top:8px;line-height:2.4;font-size:12px;color:var(--text2);">← → Move<br>↑ Rotate<br>↓ Soft drop<br>Space Hard drop</div>
+      <div class="tet-layout">
+        <canvas id="tetris-canvas" width="200" height="400" style="border-radius:var(--r4);"></canvas>
+        <div class="tet-side"><div>Next</div><canvas id="tetris-next" width="80" height="80" style="border:1px solid var(--border);border-radius:var(--r4);"></canvas>
+          <div class="hint-keyboard" style="margin-top:8px;line-height:2.4;font-size:12px;color:var(--text2);">← → Move<br>↑ Rotate<br>↓ Soft drop<br>Space Hard drop</div>
+        </div>
       </div>
-    </div>
+      <div class="touch-controls">
+        <div class="tc-row">
+          <div class="tc-btn" ontouchstart="tetTouch('left')" >←</div>
+          <div class="tc-btn tc-jump" ontouchstart="tetTouch('rot')">↻</div>
+          <div class="tc-btn" ontouchstart="tetTouch('right')">→</div>
+        </div>
+        <div class="tc-row">
+          <div class="tc-btn" ontouchstart="tetTouch('down')">↓</div>
+          <div class="tc-btn wide" ontouchstart="tetTouch('hard')">⤓ Drop</div>
+        </div>
+      </div>
     <div class="overlay" id="tetris-ov"><h3>🟦 Tetris</h3><p>Arrow keys to play</p><button class="btn-fab" onclick="tetrisStart()">▶ Start</button></div>
   </div>
 </div>
@@ -839,7 +877,8 @@ canvas{display:block;}
     <div class="gtitle">🐦 Flappy Bird</div>
     <div class="sbar">Score: <span id="fl-score">0</span>&nbsp;&nbsp;Best: <span id="fl-best">0</span></div>
     <canvas id="flappy-canvas" width="320" height="420" style="border-radius:var(--r8);border:1px solid var(--border);"></canvas>
-    <div class="hint">Space / Click / Tap to flap</div>
+    <div class="hint hint-keyboard">Space / Click / Tap to flap</div>
+    <div class="touch-controls"><div class="tc-btn wide" ontouchstart="flap()">🐦 Flap!</div></div>
     <div class="overlay" id="flappy-ov"><h3>🐦 Flappy Bird</h3><p>Tap or Space to flap!</p><button class="btn-fab" onclick="flappyStart()">▶ Start</button></div>
   </div>
 </div>
@@ -850,7 +889,8 @@ canvas{display:block;}
     <div class="gtitle">🧱 Breakout</div>
     <div class="sbar">Score: <span id="bo-score">0</span>&nbsp;&nbsp;Lives: <span id="bo-lives">3</span></div>
     <canvas id="breakout-canvas" width="400" height="320" style="border-radius:var(--r8);border:1px solid var(--border);"></canvas>
-    <div class="hint">Mouse / Touch to move paddle</div>
+    <div class="hint hint-keyboard">Mouse / Touch to move paddle</div>
+    <div class="touch-controls"><div class="hint" style="font-size:11px;color:var(--text3);">Drag finger on canvas to move paddle</div></div>
     <div class="overlay" id="breakout-ov"><h3>🧱 Breakout</h3><p>Clear all bricks!</p><button class="btn-fab" onclick="breakoutStart()">▶ Start</button></div>
   </div>
 </div>
@@ -861,7 +901,8 @@ canvas{display:block;}
     <div class="gtitle">🏓 Pong</div>
     <div class="sbar">You: <span id="pong-p">0</span>&nbsp;&nbsp;Bot: <span id="pong-b">0</span></div>
     <canvas id="pong-canvas" width="480" height="280" style="border-radius:var(--r8);border:1px solid var(--border);"></canvas>
-    <div class="hint">Mouse / Touch to move paddle</div>
+    <div class="hint hint-keyboard">Mouse / Touch to move paddle</div>
+    <div class="touch-controls"><div class="hint" style="font-size:11px;color:var(--text3);">Drag finger on canvas to move paddle</div></div>
     <div class="overlay" id="pong-ov"><h3>🏓 Pong</h3><p>First to 7 wins!</p><button class="btn-fab" onclick="pongStart()">▶ Start</button></div>
   </div>
 </div>
@@ -872,7 +913,15 @@ canvas{display:block;}
     <div class="gtitle">🚀 Asteroids</div>
     <div class="sbar">Score: <span id="ast-score">0</span>&nbsp;&nbsp;Lives: <span id="ast-lives">3</span></div>
     <canvas id="ast-canvas" width="480" height="380" style="border:1px solid var(--border);border-radius:var(--r8);"></canvas>
-    <div class="hint">WASD / Arrows move · Space shoot</div>
+    <div class="hint hint-keyboard">WASD / Arrows move · Space shoot</div>
+    <div class="touch-controls">
+      <div class="tc-row">
+        <div class="tc-btn" id="ast-left" ontouchstart="astKey('left',true)" ontouchend="astKey('left',false)">←</div>
+        <div class="tc-btn" id="ast-up" ontouchstart="astKey('up',true)" ontouchend="astKey('up',false)">↑</div>
+        <div class="tc-btn" id="ast-right" ontouchstart="astKey('right',true)" ontouchend="astKey('right',false)">→</div>
+        <div class="tc-btn tc-shoot wide" id="ast-fire" ontouchstart="astKey('fire',true)" ontouchend="astKey('fire',false)">💥 Fire</div>
+      </div>
+    </div>
     <div class="overlay" id="ast-ov"><h3>🚀 Asteroids</h3><p>Shoot the rocks!</p><button class="btn-fab" onclick="astStart()">▶ Start</button></div>
   </div>
 </div>
@@ -883,7 +932,8 @@ canvas{display:block;}
     <div class="gtitle">🌀 Dropper 3D</div>
     <div class="sbar">Height: <span id="drop-height">0</span>m&nbsp;&nbsp;Best: <span id="drop-best">0</span>m</div>
     <canvas id="dropper-canvas" width="360" height="450" style="border:1px solid var(--border);border-radius:var(--r8);"></canvas>
-    <div class="hint">Mouse / Touch to dodge platforms</div>
+    <div class="hint hint-keyboard">Mouse / Touch to dodge platforms</div>
+    <div class="touch-controls"><div class="hint" style="font-size:11px;color:var(--text3);">Drag finger on canvas to move</div></div>
     <div class="overlay" id="dropper-ov"><h3>🌀 Dropper 3D</h3><p>Fall through the gaps!</p><button class="btn-fab" onclick="dropperStart()">▶ Start</button></div>
   </div>
 </div>
@@ -894,7 +944,14 @@ canvas{display:block;}
     <div class="gtitle">🏃 Platformer</div>
     <div class="sbar">Score: <span id="plat-score">0</span>&nbsp;&nbsp;Level: <span id="plat-level">1</span></div>
     <canvas id="plat-canvas" width="480" height="320" style="border:1px solid var(--border);border-radius:var(--r8);"></canvas>
-    <div class="hint">WASD / Arrows — Double jump allowed</div>
+    <div class="hint hint-keyboard">WASD / Arrows — Double jump allowed</div>
+    <div class="touch-controls">
+      <div class="tc-row">
+        <div class="tc-btn" id="plat-left" ontouchstart="platBtn('left',true)" ontouchend="platBtn('left',false)">←</div>
+        <div class="tc-btn tc-jump wide" id="plat-jump" ontouchstart="platBtn('jump',true)" ontouchend="platBtn('jump',false)">↑ Jump</div>
+        <div class="tc-btn" id="plat-right" ontouchstart="platBtn('right',true)" ontouchend="platBtn('right',false)">→</div>
+      </div>
+    </div>
     <div class="overlay" id="plat-ov"><h3>🏃 Platformer</h3><p>Collect coins, reach the flag!</p><button class="btn-fab" onclick="platStart()">▶ Start</button></div>
   </div>
 </div>
@@ -960,7 +1017,7 @@ canvas{display:block;}
       <button class="btn" onclick="chessInit()">↺ New game</button>
       <button class="btn" onclick="chessUndo()">⟵ Undo</button>
     </div>
-    <div class="hint">You are White · Bot is Black</div>
+    <div class="hint hint-keyboard">You are White · Bot is Black</div>
   </div>
 </div>
 
@@ -995,7 +1052,8 @@ canvas{display:block;}
       <button class="chip" onclick="msInit(9,9,10)" id="ms-easy">Easy 9×9</button>
       <button class="chip on" onclick="msInit(16,9,25)" id="ms-med">Medium 16×9</button>
     </div>
-    <div class="hint">Left click reveal · Right click flag</div>
+    <div class="hint hint-keyboard">Left click reveal · Right click flag</div>
+    <div class="touch-controls"><div class="hint" style="font-size:11px;color:var(--text3);">Tap to reveal · Long press to flag</div></div>
   </div>
 </div>
 
@@ -2930,6 +2988,80 @@ function renderLog(){
 // ── PWA DETECTION ────────────────────────────────────
 // Run immediately so sidebar shrinks before first render, no flash
 const isPWA=()=>window.matchMedia('(display-mode: standalone)').matches||window.navigator.standalone===true;
+// ── TOUCH DETECTION ──────────────────────────────────
+// Detect touch device and apply body.touch so controls show/hide correctly
+(function(){
+  function enableTouch(){
+    if(!document.body.classList.contains('touch')){
+      document.body.classList.add('touch');
+    }
+  }
+  // Immediate check
+  if('ontouchstart' in window||navigator.maxTouchPoints>0)enableTouch();
+  // Also trigger on first real touch in case pointer events mislead us
+  window.addEventListener('touchstart',enableTouch,{once:true,passive:true});
+})();
+
+// ── SNAKE TOUCH BUTTONS ───────────────────────────────
+window.snkBtn=function(dir,pressed){
+  // Map direction to pending move for snake
+  if(!pressed)return;
+  const map={up:{x:0,y:-1},down:{x:0,y:1},left:{x:-1,y:0},right:{x:1,y:0}};
+  // Access snake's pending via a dispatched keydown event
+  const keyMap={up:'ArrowUp',down:'ArrowDown',left:'ArrowLeft',right:'ArrowRight'};
+  document.dispatchEvent(new KeyboardEvent('keydown',{key:keyMap[dir],bubbles:true}));
+};
+
+// ── TETRIS TOUCH BUTTONS ──────────────────────────────
+window.tetTouch=function(action){
+  const keyMap={left:'ArrowLeft',right:'ArrowRight',down:'ArrowDown',rot:'ArrowUp',hard:' '};
+  document.dispatchEvent(new KeyboardEvent('keydown',{key:keyMap[action],bubbles:true,code:action==='hard'?'Space':''}));
+};
+
+// ── ASTEROIDS TOUCH BUTTONS ───────────────────────────
+window.astKey=function(dir,pressed){
+  const el=document.getElementById('ast-'+dir);
+  if(el)el.classList.toggle('pressed',pressed);
+  // Simulate keydown/keyup on the keys object used by asteroids
+  const keyMap={left:'ArrowLeft',up:'ArrowUp',right:'ArrowRight',fire:' '};
+  const evtType=pressed?'keydown':'keyup';
+  document.dispatchEvent(new KeyboardEvent(evtType,{key:keyMap[dir],bubbles:true}));
+};
+
+// ── PLATFORMER TOUCH BUTTONS ──────────────────────────
+window.platBtn=function(dir,pressed){
+  const el=document.getElementById('plat-'+dir);
+  if(el)el.classList.toggle('pressed',pressed);
+  if(dir==='jump'){
+    if(pressed)document.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowUp',bubbles:true}));
+    else document.dispatchEvent(new KeyboardEvent('keyup',{key:'ArrowUp',bubbles:true}));
+  } else {
+    const key=dir==='left'?'ArrowLeft':'ArrowRight';
+    const evtType=pressed?'keydown':'keyup';
+    document.dispatchEvent(new KeyboardEvent(evtType,{key,bubbles:true}));
+  }
+};
+
+// ── MINESWEEPER LONG-PRESS TO FLAG ────────────────────
+// Applied via event delegation on ms-grid cells
+(function(){
+  let lpTimer=null;
+  const LONG_PRESS_MS=500;
+  document.addEventListener('touchstart',e=>{
+    const cell=e.target.closest('.ms-cell');
+    if(!cell)return;
+    lpTimer=setTimeout(()=>{
+      // Simulate right-click / contextmenu to trigger flag
+      cell.dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,cancelable:true}));
+      // Vibrate if available for haptic feedback
+      if(navigator.vibrate)navigator.vibrate(40);
+    },LONG_PRESS_MS);
+  },{passive:true});
+  document.addEventListener('touchend',()=>{clearTimeout(lpTimer);lpTimer=null;},{passive:true});
+  document.addEventListener('touchmove',()=>{clearTimeout(lpTimer);lpTimer=null;},{passive:true});
+  document.addEventListener('touchcancel',()=>{clearTimeout(lpTimer);lpTimer=null;},{passive:true});
+})();
+
 (function applyPWAClass(){
   if(isPWA())document.body.classList.add('pwa');
   // Also listen for if user installs while page is open
