@@ -1014,12 +1014,13 @@ body.touch .sdc{width:38px;height:38px;font-size:15px;}
 <!-- CHESS -->
 <div class="gf" id="chess-frame">
   <div class="gc">
-    <div class="gtitle">♟️ Chess vs Bot</div>
+    <div class="gtitle">♟️ Chess</div>
     <div class="sbar" id="chess-status">White to move</div>
-    <div style="display:flex;gap:6px;align-items:center;font-size:12px;color:var(--text2);">
-      Bot:
-      <button id="chess-easy" class="chip on" onclick="setChessDiff('easy')">Easy</button>
-      <button id="chess-hard" class="chip" onclick="setChessDiff('hard')">Hard 🧠</button>
+    <div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap;justify-content:center;font-size:12px;color:var(--text2);">
+      <button id="chess-pvb-easy" class="chip on" onclick="setChessMode('pvb-easy')">Medium</button>
+      <button id="chess-pvb-hard" class="chip" onclick="setChessMode('pvb-hard')">Hard 🧠</button>
+      <button id="chess-pvp" class="chip" onclick="setChessMode('pvp')">2 Players</button>
+      <button id="chess-bvb" class="chip" onclick="setChessMode('bvb')">Bot vs Bot</button>
     </div>
     <div id="chess-board"></div>
     <div id="promo-overlay">
@@ -1036,8 +1037,24 @@ body.touch .sdc{width:38px;height:38px;font-size:15px;}
     <div style="display:flex;gap:6px;margin-top:6px">
       <button class="btn" onclick="chessInit()">↺ New game</button>
       <button class="btn" onclick="chessUndo()">⟵ Undo</button>
+      <button class="btn" onclick="chessPGN()">📋 PGN</button>
     </div>
-    <div class="hint hint-keyboard">You are White · Bot is Black</div>
+    <!-- BvB difficulty selectors — only shown in Bot vs Bot mode -->
+    <div id="bvb-controls" style="display:none;flex-direction:column;align-items:center;gap:6px;margin-top:2px;">
+      <div style="font-size:11px;color:var(--text3);letter-spacing:.5px;">WHITE BOT</div>
+      <div style="display:flex;gap:5px;">
+        <button id="bvb-w-easy" class="chip on" onclick="setBvbDiff('w','easy')">Easy</button>
+        <button id="bvb-w-med" class="chip" onclick="setBvbDiff('w','med')">Medium</button>
+        <button id="bvb-w-hard" class="chip" onclick="setBvbDiff('w','hard')">Hard 🧠</button>
+      </div>
+      <div style="font-size:11px;color:var(--text3);letter-spacing:.5px;">BLACK BOT</div>
+      <div style="display:flex;gap:5px;">
+        <button id="bvb-b-easy" class="chip" onclick="setBvbDiff('b','easy')">Easy</button>
+        <button id="bvb-b-med" class="chip on" onclick="setBvbDiff('b','med')">Medium</button>
+        <button id="bvb-b-hard" class="chip" onclick="setBvbDiff('b','hard')">Hard 🧠</button>
+      </div>
+    </div>
+    <div class="hint" id="chess-hint">You are White · Bot is Black</div>
   </div>
 </div>
 
@@ -2046,39 +2063,59 @@ function filterGames(q){
 (function(){
   const UNI={K:'♔',Q:'♕',R:'♖',B:'♗',N:'♘',P:'♙',k:'♚',q:'♛',r:'♜',b:'♝',n:'♞',p:'♟'};
   const INIT='rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR';
-  let board,sel,turn,hist;
+  let board,sel,turn,hist,gameMode,castleRights,enPassant,bvbTimer;
+  let pgnMoves=[]; // stores move strings for PGN export
+  let bvbDiff={w:'easy',b:'med'}; // independent difficulty for each bot in BvB
+  const files='abcdefgh';
+  const sqName=idx=>files[idx%8]+(8-Math.floor(idx/8));
   const sq=(r,c)=>r*8+c;
   const isW=p=>p&&p===p.toUpperCase();
   const isB=p=>p&&p!==p.toUpperCase();
 
   function chessInit(){
-    board=Array(64).fill(null);turn='w';sel=null;hist=[];
+    clearTimeout(bvbTimer);
+    board=Array(64).fill(null);turn='w';sel=null;hist=[];enPassant=-1;pgnMoves=[];
+    castleRights={wK:true,wQ:true,bK:true,bQ:true};
     let r=0,c=0;
     for(const ch of INIT){
       if(ch==='/'){r++;c=0;}
       else if(ch>='1'&&ch<='8')c+=+ch;
       else{board[sq(r,c)]=ch;c++;}
     }
-    render();setSt('White to move');
+    // Show BvB difficulty controls only in bvb mode
+    const bvbCtrl=document.getElementById('bvb-controls');
+    if(bvbCtrl)bvbCtrl.style.display=gameMode==='bvb'?'flex':'none';
+    render();
+    const hints={'pvb-easy':'You are White · Bot is Medium difficulty','pvb-hard':'You are White · Bot is Hard difficulty','pvp':'White moves first · Pass the device after each move','bvb':'Watch the bots battle!'};
+    const h=document.getElementById('chess-hint');if(h)h.textContent=hints[gameMode]||'';
+    setSt('White to move');
+    if(gameMode==='bvb')bvbTimer=setTimeout(botMvSide,700);
   }
   window.chessInit=chessInit;
   window.chessUndo=function(){
-    if(hist.length<2)return;
-    hist.pop();const st=hist.pop();
-    board=st.b;turn=st.t;sel=null;
-    render();setSt(turn==='w'?'White to move':'Black to move');
+    if(gameMode==='bvb')return;
+    if(!hist.length)return;
+    const st=hist.pop();
+    board=st.b;turn=st.t;enPassant=st.ep;castleRights=st.cr;sel=null;
+    render();setSt((turn==='w'?'White':'Black')+' to move');
   };
   function setSt(t){document.getElementById('chess-status').textContent=t;}
 
-  // ATTACK SQUARES: squares a piece threatens (for check detection)
-  // Differs from move squares: pawn attacks diagonally, king attacks regardless of own-king safety
+  gameMode='pvb-easy';
+  window.setChessMode=function(m){
+    gameMode=m;
+    ['pvb-easy','pvb-hard','pvp','bvb'].forEach(x=>{
+      const el=document.getElementById('chess-'+x);if(el)el.classList.toggle('on',x===m);
+    });
+    chessInit();
+  };
+
   function getAttacks(b,idx){
     const p=b[idx];if(!p)return[];
     const r=Math.floor(idx/8),c=idx%8,atk=[];
     const addSq=(nr,nc)=>{if(nr>=0&&nr<8&&nc>=0&&nc<8)atk.push(sq(nr,nc));};
     const slide=(dr,dc)=>{let nr=r+dr,nc=c+dc;while(nr>=0&&nr<8&&nc>=0&&nc<8){atk.push(sq(nr,nc));if(b[sq(nr,nc)])break;nr+=dr;nc+=dc;}};
     const pt=p.toLowerCase();
-    // Pawn attacks diagonally only
     if(pt==='p'){const d=isW(p)?-1:1;[c-1,c+1].forEach(nc2=>{if(nc2>=0&&nc2<8&&r+d>=0&&r+d<8)atk.push(sq(r+d,nc2));});}
     if(pt==='n')[[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]].forEach(([dr,dc])=>addSq(r+dr,c+dc));
     if(pt==='b'||pt==='q')[[1,1],[1,-1],[-1,1],[-1,-1]].forEach(([dr,dc])=>slide(dr,dc));
@@ -2087,300 +2124,399 @@ function filterGames(q){
     return atk;
   }
 
-  // PSEUDO-LEGAL MOVES: piece can go here if we ignore check
-  function getMoves(b,idx){
+  function sqAttacked(b,idx,byWhite){
+    for(let i=0;i<64;i++){const p=b[i];if(!p||(byWhite?!isW(p):!isB(p)))continue;if(getAttacks(b,i).includes(idx))return true;}
+    return false;
+  }
+
+  function isInCheck(b,white){
+    const kIdx=b.indexOf(white?'K':'k');
+    if(kIdx<0)return false;
+    return sqAttacked(b,kIdx,!white);
+  }
+
+  function getMoves(b,idx,ep,cr){
+    if(ep===undefined)ep=enPassant;if(cr===undefined)cr=castleRights;
     const p=b[idx];if(!p)return[];
     const r=Math.floor(idx/8),c=idx%8,mvs=[];
-    const canLand=(nr,nc)=>{
-      if(nr<0||nr>=8||nc<0||nc>=8)return false;
-      const t=b[sq(nr,nc)];
-      return !t||(isW(p)?isB(t):isW(t));
-    };
+    const canLand=(nr,nc)=>{if(nr<0||nr>=8||nc<0||nc>=8)return false;const t=b[sq(nr,nc)];return!t||(isW(p)?isB(t):isW(t));};
     const slide=(dr,dc)=>{let nr=r+dr,nc=c+dc;while(nr>=0&&nr<8&&nc>=0&&nc<8){const t=b[sq(nr,nc)];if(t){if(isW(p)?isB(t):isW(t))mvs.push(sq(nr,nc));break;}mvs.push(sq(nr,nc));nr+=dr;nc+=dc;}};
     const pt=p.toLowerCase();
     if(pt==='p'){
       const d=isW(p)?-1:1;
       if(r+d>=0&&r+d<8&&!b[sq(r+d,c)])mvs.push(sq(r+d,c));
       if((isW(p)&&r===6||isB(p)&&r===1)&&!b[sq(r+d,c)]&&!b[sq(r+d*2,c)])mvs.push(sq(r+d*2,c));
-      [c-1,c+1].forEach(nc2=>{if(nc2>=0&&nc2<8&&r+d>=0&&r+d<8){const t=b[sq(r+d,nc2)];if(t&&(isW(p)?isB(t):isW(t)))mvs.push(sq(r+d,nc2));}});
+      [c-1,c+1].forEach(nc2=>{
+        if(nc2<0||nc2>=8)return;
+        const cap=sq(r+d,nc2);
+        if(b[cap]&&(isW(p)?isB(b[cap]):isW(b[cap])))mvs.push(cap);
+        if(ep>=0&&cap===ep)mvs.push(cap);
+      });
     }
     if(pt==='n')[[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]].forEach(([dr,dc])=>{if(canLand(r+dr,c+dc))mvs.push(sq(r+dr,c+dc));});
     if(pt==='b'||pt==='q')[[1,1],[1,-1],[-1,1],[-1,-1]].forEach(([dr,dc])=>slide(dr,dc));
     if(pt==='r'||pt==='q')[[1,0],[-1,0],[0,1],[0,-1]].forEach(([dr,dc])=>slide(dr,dc));
-    if(pt==='k')[[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]].forEach(([dr,dc])=>{if(canLand(r+dr,c+dc))mvs.push(sq(r+dr,c+dc));});
+    if(pt==='k'){
+      [[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]].forEach(([dr,dc])=>{if(canLand(r+dr,c+dc))mvs.push(sq(r+dr,c+dc));});
+      if(isW(p)&&r===7&&c===4){
+        if(cr.wK&&!b[sq(7,5)]&&!b[sq(7,6)]&&b[sq(7,7)]==='R'&&!isInCheck(b,true)&&!sqAttacked(b,sq(7,5),false)&&!sqAttacked(b,sq(7,6),false))mvs.push(sq(7,6));
+        if(cr.wQ&&!b[sq(7,3)]&&!b[sq(7,2)]&&!b[sq(7,1)]&&b[sq(7,0)]==='R'&&!isInCheck(b,true)&&!sqAttacked(b,sq(7,3),false)&&!sqAttacked(b,sq(7,2),false))mvs.push(sq(7,2));
+      }
+      if(isB(p)&&r===0&&c===4){
+        if(cr.bK&&!b[sq(0,5)]&&!b[sq(0,6)]&&b[sq(0,7)]==='r'&&!isInCheck(b,false)&&!sqAttacked(b,sq(0,5),true)&&!sqAttacked(b,sq(0,6),true))mvs.push(sq(0,6));
+        if(cr.bQ&&!b[sq(0,3)]&&!b[sq(0,2)]&&!b[sq(0,1)]&&b[sq(0,0)]==='r'&&!isInCheck(b,false)&&!sqAttacked(b,sq(0,3),true)&&!sqAttacked(b,sq(0,2),true))mvs.push(sq(0,2));
+      }
+    }
     return mvs;
   }
 
-  // IS IN CHECK: uses getAttacks so pawn checks are diagonal-only, king attacks don't recurse
-  function isInCheck(b,white){
-    const king=white?'K':'k';
-    const kIdx=b.indexOf(king);
-    if(kIdx<0)return false;
-    for(let i=0;i<64;i++){
-      const p=b[i];
-      if(!p||( white?isW(p):isB(p)))continue;// skip empty + same color
-      if(getAttacks(b,i).includes(kIdx))return true;
-    }
-    return false;
-  }
-
-  // LEGAL MOVES: filter pseudo-legal, remove moves that leave own king in check
-  function getLegalMoves(b,idx){
+  function getLegalMoves(b,idx,ep,cr){
     const p=b[idx];if(!p)return[];
     const white=isW(p);
-    return getMoves(b,idx).filter(to=>{
-      const nb=[...b];nb[to]=nb[idx];nb[idx]=null;
-      return !isInCheck(nb,white);
+    return getMoves(b,idx,ep,cr).filter(to=>{
+      const nb=[...b];
+      if(p.toLowerCase()==='p'&&to===ep&&ep>=0){const capRow=white?Math.floor(ep/8)+1:Math.floor(ep/8)-1;nb[sq(capRow,ep%8)]=null;}
+      if(p.toLowerCase()==='k'&&Math.abs(to%8-(idx%8))===2){const row=Math.floor(idx/8);if(to%8===6){nb[sq(row,5)]=nb[sq(row,7)];nb[sq(row,7)]=null;}if(to%8===2){nb[sq(row,3)]=nb[sq(row,0)];nb[sq(row,0)]=null;}}
+      nb[to]=nb[idx];nb[idx]=null;
+      return!isInCheck(nb,white);
     });
   }
 
-  // Any legal move exists for this side?
-  function hasLegalMoves(b,white){
-    for(let i=0;i<64;i++){
-      const p=b[i];
-      if(!p||(white?!isW(p):!isB(p)))continue;
-      if(getLegalMoves(b,i).length>0)return true;
-    }
+  function hasLegalMoves(b,white,ep,cr){
+    for(let i=0;i<64;i++){const p=b[i];if(!p||(white?!isW(p):!isB(p)))continue;if(getLegalMoves(b,i,ep,cr).length>0)return true;}
     return false;
   }
 
-  function mkMv(b,fr,to){b[to]=b[fr];b[fr]=null;}
+  function applyMove(b,fr,to,cr,ep){
+    const p=b[fr],pt=p.toLowerCase();
+    const nb=[...b];let newEp=-1,newCr={...cr};
+    if(pt==='p'&&to===ep&&ep>=0){const capRow=isW(p)?Math.floor(ep/8)+1:Math.floor(ep/8)-1;nb[sq(capRow,ep%8)]=null;}
+    if(pt==='p'&&Math.abs(Math.floor(to/8)-Math.floor(fr/8))===2)newEp=sq((Math.floor(fr/8)+Math.floor(to/8))>>1,fr%8);
+    if(pt==='k'&&Math.abs(to%8-fr%8)===2){const row=Math.floor(fr/8);if(to%8===6){nb[sq(row,5)]=nb[sq(row,7)];nb[sq(row,7)]=null;}if(to%8===2){nb[sq(row,3)]=nb[sq(row,0)];nb[sq(row,0)]=null;}}
+    if(fr===sq(7,4)||fr===sq(7,7)||to===sq(7,7))newCr.wK=false;
+    if(fr===sq(7,4)||fr===sq(7,0)||to===sq(7,0))newCr.wQ=false;
+    if(fr===sq(0,4)||fr===sq(0,7)||to===sq(0,7))newCr.bK=false;
+    if(fr===sq(0,4)||fr===sq(0,0)||to===sq(0,0))newCr.bQ=false;
+    nb[to]=nb[fr];nb[fr]=null;
+    return{nb,newEp,newCr};
+  }
 
-  // Returns end-state message or null if game continues
-  function checkEnd(b,whiteTurn){
-    const inChk=isInCheck(b,whiteTurn);
-    const hasMvs=hasLegalMoves(b,whiteTurn);
-    if(!hasMvs){
-      if(inChk)return whiteTurn?'Checkmate — Bot wins! 👑':'Checkmate — You win! 👑';
-      return 'Stalemate — Draw 🤝';
-    }
-    if(inChk)return whiteTurn?'Check — watch your king! ⚠️':'Black is in check!';
+  function checkEnd(b,whiteTurn,ep,cr){
+    const inChk=isInCheck(b,whiteTurn),hasMvs=hasLegalMoves(b,whiteTurn,ep,cr);
+    if(!hasMvs)return inChk?`Checkmate — ${whiteTurn?'Black':'White'} wins! 👑`:'Stalemate — Draw 🤝';
+    if(inChk)return(whiteTurn?'White':'Black')+' is in check! ⚠️';
     return null;
   }
 
-  // Promotion state
   let _promoCallback=null;
   const PROMO_UNI_W={Q:'♕',R:'♖',B:'♗',N:'♘'};
   const PROMO_UNI_B={q:'♛',r:'♜',b:'♝',n:'♞'};
-
-  function showPromo(white, cb){
+  function showPromo(white,cb){
     const ov=document.getElementById('promo-overlay');
-    const pieces=white?PROMO_UNI_W:PROMO_UNI_B;
-    // Fill icons — always show white glyphs for player, black for bot
-    ['Q','R','B','N'].forEach(p=>{
-      const key=white?p:p.toLowerCase();
-      const el=document.getElementById('promo-'+p);
-      if(el){
-        el.innerHTML=`<span class="${white?'wp':'bp'}">${pieces[key]||PROMO_UNI_W[p]}</span>`;
-        el.style.cssText=white?'':'';
-      }
-    });
-    ov.classList.add('show');
-    _promoCallback=cb;
+    ['Q','R','B','N'].forEach(p=>{const el=document.getElementById('promo-'+p);if(el)el.innerHTML=`<span class="${white?'wp':'bp'}">${white?PROMO_UNI_W[p]:PROMO_UNI_B[p.toLowerCase()]}</span>`;});
+    ov.classList.add('show');_promoCallback=cb;
   }
-
   window.choosePromo=function(piece){
-    const ov=document.getElementById('promo-overlay');
-    ov.classList.remove('show');
+    document.getElementById('promo-overlay').classList.remove('show');
     if(_promoCallback){_promoCallback(piece);_promoCallback=null;}
   };
 
-  function afterPlayerMove(fromIdx,toIdx){
-    sel=null;
-    if(!board.includes('k')){turn='done';render();setSt('You win! 👑');gameLog('Chess','Win','King captured');return;}
-    const end=checkEnd(board,false);
-    if(end&&(end.includes('Checkmate')||end.includes('Stalemate'))){
-      turn='done';render();setSt(end);
-      gameLog('Chess',end.includes('You win')?'Win':'Draw',end);
-      return;
-    }
-    turn='b';render();setSt(end||'Bot thinking...');
-    setTimeout(botMv,420);
+  function handleClick(idx,white){
+    if(turn==='done')return;
+    if(sel===null){if(board[idx]&&(white?isW(board[idx]):isB(board[idx]))){sel=idx;render();}return;}
+    const mvs=getLegalMoves(board,sel,enPassant,castleRights);
+    if(mvs.includes(idx)){
+      const fr=sel;sel=null;
+      // Capture SAN before applying move
+      const sanBase=buildSAN(board,fr,idx,enPassant,castleRights);
+      hist.push({b:[...board],t:turn,ep:enPassant,cr:{...castleRights}});
+      const{nb,newEp,newCr}=applyMove(board,fr,idx,castleRights,enPassant);
+      board=[...nb];enPassant=newEp;castleRights=newCr;
+      const piece=board[idx];
+      const needPromo=(piece==='P'&&Math.floor(idx/8)===0)||(piece==='p'&&Math.floor(idx/8)===7);
+      if(needPromo){
+        render();showPromo(isW(piece),(p)=>{
+          board[idx]=p;
+          const suffix=annotateSAN(board,!white,newEp,newCr);
+          pgnMoves.push(sanBase+'='+p.toUpperCase()+suffix);
+          afterMove();
+        });
+      } else {
+        const suffix=annotateSAN(board,!white,newEp,newCr);
+        pgnMoves.push(sanBase+suffix);
+        afterMove();
+      }
+    } else if(board[idx]&&(white?isW(board[idx]):isB(board[idx]))){sel=idx;render();}
+    else{sel=null;render();}
   }
 
   function clickSq(idx){
-    if(turn!=='w')return;
-    if(sel===null){
-      if(board[idx]&&isW(board[idx])){sel=idx;render();}
-    } else {
-      const mvs=getLegalMoves(board,sel);
-      if(mvs.includes(idx)){
-        hist.push({b:[...board],t:turn});
-        mkMv(board,sel,idx);
-        const isPromo=board[idx]==='P'&&Math.floor(idx/8)===0;
-        if(isPromo){
-          render();
-          // Show picker and wait
-          showPromo(true,(piece)=>{
-            board[idx]=piece;
-            afterPlayerMove(sel,idx);
-          });
-        } else {
-          afterPlayerMove(sel,idx);
-        }
-      } else if(board[idx]&&isW(board[idx])){
-        sel=idx;render();
-      } else {
-        sel=null;render();
-      }
+    if(turn==='done')return;
+    const w=turn==='w';
+    if((gameMode==='pvb-easy'||gameMode==='pvb-hard')&&!w)return;
+    if(gameMode==='bvb')return;
+    handleClick(idx,w);
+  }
+
+  function afterMove(){
+    const nextWhite=turn!=='w';const nextTurn=turn==='w'?'b':'w';
+    render();
+    const end=checkEnd(board,nextWhite,enPassant,castleRights);
+    if(end&&(end.includes('Checkmate')||end.includes('Stalemate'))){
+      turn='done';render();setSt(end);
+      const pvb=gameMode==='pvb-easy'||gameMode==='pvb-hard';
+      gameLog('Chess',pvb&&end.includes('White wins')?'Win':end.includes('Stalemate')?'Draw':'Loss',end);
+      return;
+    }
+    turn=nextTurn;
+    const label=gameMode==='pvp'?(nextWhite?'White':'Black')+' to move':gameMode==='bvb'?(nextWhite?'White':'Black')+' bot thinking...':nextWhite?'White to move':'Bot thinking...';
+    setSt(end||label);
+    if(gameMode==='bvb'||(gameMode!=='pvp'&&turn==='b')){
+      bvbTimer=setTimeout(botMvSide,gameMode==='bvb'?800:420);
     }
   }
 
-  // ── DIFFICULTY ───────────────────────────────────────
-  let chessDiff='easy';
-  window.setChessDiff=function(d){
-    chessDiff=d;
-    document.getElementById('chess-easy').classList.toggle('on',d==='easy');
-    document.getElementById('chess-hard').classList.toggle('on',d==='hard');
+  const VALS={p:100,n:320,b:330,r:500,q:900,k:20000};
+  const PST={p:[0,0,0,0,0,0,0,0,50,50,50,50,50,50,50,50,10,10,20,30,30,20,10,10,5,5,10,25,25,10,5,5,0,0,0,20,20,0,0,0,5,-5,-10,0,0,-10,-5,5,5,10,10,-20,-20,10,10,5,0,0,0,0,0,0,0,0],n:[-50,-40,-30,-30,-30,-30,-40,-50,-40,-20,0,0,0,0,-20,-40,-30,0,10,15,15,10,0,-30,-30,5,15,20,20,15,5,-30,-30,0,15,20,20,15,0,-30,-30,5,10,15,15,10,5,-30,-40,-20,0,5,5,0,-20,-40,-50,-40,-30,-30,-30,-30,-40,-50],b:[-20,-10,-10,-10,-10,-10,-10,-20,-10,0,0,0,0,0,0,-10,-10,0,5,10,10,5,0,-10,-10,5,5,10,10,5,5,-10,-10,0,10,10,10,10,0,-10,-10,10,10,10,10,10,10,-10,-10,5,0,0,0,0,5,-10,-20,-10,-10,-10,-10,-10,-10,-20],r:[0,0,0,0,0,0,0,0,5,10,10,10,10,10,10,5,-5,0,0,0,0,0,0,-5,-5,0,0,0,0,0,0,-5,-5,0,0,0,0,0,0,-5,-5,0,0,0,0,0,0,-5,-5,0,0,0,0,0,0,-5,0,0,0,5,5,0,0,0],q:[-20,-10,-10,-5,-5,-10,-10,-20,-10,0,0,0,0,0,0,-10,-10,0,5,5,5,5,0,-10,-5,0,5,5,5,5,0,-5,0,0,5,5,5,5,0,-5,-10,5,5,5,5,5,0,-10,-10,0,5,0,0,0,0,-10,-20,-10,-10,-5,-5,-10,-10,-20],k:[-30,-40,-40,-50,-50,-40,-40,-30,-30,-40,-40,-50,-50,-40,-40,-30,-30,-40,-40,-50,-50,-40,-40,-30,-30,-40,-40,-50,-50,-40,-40,-30,-20,-30,-30,-40,-40,-30,-30,-20,-10,-20,-20,-20,-20,-20,-20,-10,20,20,0,0,0,0,20,20,20,30,10,0,0,10,30,20]};
+
+  function evaluate(b){
+    let s=0;
+    for(let i=0;i<64;i++){const p=b[i];if(!p)continue;const pt=p.toLowerCase();const r2=Math.floor(i/8),c2=i%8;const pi=isW(p)?(7-r2)*8+c2:r2*8+c2;s+=(isB(p)?1:-1)*((VALS[pt]||0)+(PST[pt]?PST[pt][pi]:0));}
+    return s;
+  }
+
+  function minimax(b,depth,alpha,beta,maxBlack,ep,cr){
+    if(depth===0)return{score:evaluate(b)};
+    const white=!maxBlack;
+    const moves=[];
+    for(let i=0;i<64;i++){const p=b[i];if(!p||(white?!isW(p):!isB(p)))continue;getLegalMoves(b,i,ep,cr).forEach(to=>moves.push({fr:i,to}));}
+    if(!moves.length){return isInCheck(b,white)?{score:maxBlack?-99999:99999}:{score:0};}
+    moves.sort((a,z)=>(b[z.to]?1:0)-(b[a.to]?1:0));
+    let best=maxBlack?-Infinity:Infinity,bm=moves[0];
+    for(const mv of moves){
+      const{nb,newEp,newCr}=applyMove(b,mv.fr,mv.to,cr,ep);
+      if(nb[mv.to]==='p'&&Math.floor(mv.to/8)===7)nb[mv.to]='q';
+      if(nb[mv.to]==='P'&&Math.floor(mv.to/8)===0)nb[mv.to]='Q';
+      const res=minimax(nb,depth-1,alpha,beta,!maxBlack,newEp,newCr);
+      if(maxBlack){if(res.score>best){best=res.score;bm=mv;}alpha=Math.max(alpha,best);}
+      else{if(res.score<best){best=res.score;bm=mv;}beta=Math.min(beta,best);}
+      if(beta<=alpha)break;
+    }
+    return{score:best,move:bm};
+  }
+
+  function minimax(b,depth,alpha,beta,maxBlack,ep,cr){
+    if(depth===0)return{score:evaluate(b)};
+    const white=!maxBlack;
+    const moves=[];
+    for(let i=0;i<64;i++){const p=b[i];if(!p||(white?!isW(p):!isB(p)))continue;getLegalMoves(b,i,ep,cr).forEach(to=>moves.push({fr:i,to}));}
+    if(!moves.length){return isInCheck(b,white)?{score:maxBlack?-99999:99999}:{score:0};}
+    // Shuffle before sorting captures to break ties randomly
+    for(let i=moves.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[moves[i],moves[j]]=[moves[j],moves[i]];}
+    moves.sort((a,z)=>(b[z.to]?1:0)-(b[a.to]?1:0));
+    let best=maxBlack?-Infinity:Infinity,bm=moves[0];
+    const candidates=[];
+    for(const mv of moves){
+      const{nb,newEp,newCr}=applyMove(b,mv.fr,mv.to,cr,ep);
+      if(nb[mv.to]==='p'&&Math.floor(mv.to/8)===7)nb[mv.to]='q';
+      if(nb[mv.to]==='P'&&Math.floor(mv.to/8)===0)nb[mv.to]='Q';
+      const res=minimax(nb,depth-1,alpha,beta,!maxBlack,newEp,newCr);
+      if(maxBlack){
+        if(res.score>best){best=res.score;bm=mv;candidates.length=0;candidates.push(mv);}
+        else if(res.score===best){candidates.push(mv);}
+        alpha=Math.max(alpha,best);
+      } else {
+        if(res.score<best){best=res.score;bm=mv;candidates.length=0;candidates.push(mv);}
+        else if(res.score===best){candidates.push(mv);}
+        beta=Math.min(beta,best);
+      }
+      if(beta<=alpha)break;
+    }
+    // Pick randomly among equal-score moves for variety
+    if(candidates.length>1)bm=candidates[Math.floor(Math.random()*candidates.length)];
+    return{score:best,move:bm};
+  }
+
+  // Get difficulty for current side (used in BvB or vs bot)
+  function getDiff(){
+    if(gameMode==='bvb')return turn==='w'?bvbDiff.w:bvbDiff.b;
+    return gameMode==='pvb-hard'?'hard':'easy';
+  }
+
+  function botMvSide(){
+    if(turn==='done')return;
+    const maxBlack=turn==='b';
+    const diff=getDiff();
+    if(diff==='hard'){
+      render();setSt('🧠 Thinking...');
+      setTimeout(()=>{
+        const res=minimax(board,3,-Infinity,Infinity,maxBlack,enPassant,castleRights);
+        if(res.move)execBotMove(res.move.fr,res.move.to);
+        else{turn='done';setSt('Stalemate — Draw 🤝');}
+      },30);
+    } else if(diff==='med'){
+      // Medium: minimax depth 2 with noise — faster, less perfect
+      render();setSt('Thinking...');
+      setTimeout(()=>{
+        const res=minimax(board,2,-Infinity,Infinity,maxBlack,enPassant,castleRights);
+        if(res.move)execBotMove(res.move.fr,res.move.to);
+        else{turn='done';setSt('Stalemate — Draw 🤝');}
+      },20);
+    } else {
+      // Easy: pure greedy with heavy noise so it makes mistakes
+      let best=-9999,bf=-1,bt=-1;
+      for(let i=0;i<64;i++){
+        const p=board[i];if(!p||(maxBlack?!isB(p):!isW(p)))continue;
+        getLegalMoves(board,i,enPassant,castleRights).forEach(to=>{
+          let sc=(board[to]?VALS[board[to].toLowerCase()]:0)+Math.random()*120;
+          const{nb}=applyMove(board,i,to,castleRights,enPassant);
+          if(isInCheck(nb,!maxBlack))sc+=40;
+          if(sc>best){best=sc;bf=i;bt=to;}
+        });
+      }
+      if(bf>=0)execBotMove(bf,bt);
+      else{turn='done';setSt('Stalemate — Draw 🤝');}
+    }
+  }
+
+  function execBotMove(fr,to){
+    const sanBase=buildSAN(board,fr,to,enPassant,castleRights);
+    hist.push({b:[...board],t:turn,ep:enPassant,cr:{...castleRights}});
+    const{nb,newEp,newCr}=applyMove(board,fr,to,castleRights,enPassant);
+    board=[...nb];enPassant=newEp;castleRights=newCr;
+    let san=sanBase;
+    if(board[to]==='p'&&Math.floor(to/8)===7){board[to]='q';san+='=Q';}
+    if(board[to]==='P'&&Math.floor(to/8)===0){board[to]='Q';san+='=Q';}
+    const nextWhite=turn!=='w';
+    san+=annotateSAN(board,nextWhite,newEp,newCr);
+    pgnMoves.push(san);
+    afterMove();
+  }
+
+  // Build Standard Algebraic Notation for a move (before applying it)
+  function buildSAN(b,fr,to,ep,cr){
+    const p=b[fr];if(!p)return'?';
+    const pt=p.toLowerCase();
+    const isCapture=!!b[to]||(pt==='p'&&to===ep&&ep>=0);
+
+    // Castling
+    if(pt==='k'&&Math.abs(to%8-fr%8)===2)return to%8===6?'O-O':'O-O-O';
+
+    // Piece letter (blank for pawn)
+    const pieceLetter=pt==='p'?'':pt.toUpperCase();
+
+    // Disambiguation: find other same-type pieces that can also go to `to`
+    let needFile=false,needRank=false;
+    if(pt!=='p'){
+      const ambig=[];
+      for(let i=0;i<64;i++){
+        if(i===fr||!b[i])continue;
+        if(b[i]!==p)continue; // same piece, same color
+        if(getLegalMoves(b,i,ep,cr).includes(to))ambig.push(i);
+      }
+      if(ambig.length>0){
+        const sameFile=ambig.some(i=>i%8===fr%8);
+        const sameRank=ambig.some(i=>Math.floor(i/8)===Math.floor(fr/8));
+        if(!sameFile)needFile=true;
+        else if(!sameRank)needRank=true;
+        else{needFile=true;needRank=true;}
+      }
+    }
+
+    let dis='';
+    if(pt==='p'&&isCapture)dis=files[fr%8]; // pawn captures always include file
+    else{
+      if(needFile||pt!=='p')dis+=needFile?files[fr%8]:'';
+      if(needRank)dis+=''+(8-Math.floor(fr/8));
+    }
+
+    const captureStr=isCapture?'x':'';
+    const dest=sqName(to);
+    return pieceLetter+dis+captureStr+dest;
+  }
+
+  // Append '+' for check or '#' for checkmate after a move has been applied
+  function annotateSAN(b,nextWhite,ep,cr){
+    if(!isInCheck(b,nextWhite))return'';
+    if(!hasLegalMoves(b,nextWhite,ep,cr))return'#';
+    return'+';
+  }
+
+  window.setBvbDiff=function(side,diff){
+    bvbDiff[side]=diff;
+    ['easy','med','hard'].forEach(d=>{
+      const el=document.getElementById(`bvb-${side}-${d}`);
+      if(el)el.classList.toggle('on',d===diff);
+    });
+    // Restart so new diff takes effect
     chessInit();
   };
 
-  // Piece values
-  const VALS={p:100,n:320,b:330,r:500,q:900,k:20000};
+  window.chessPGN=function(){
+    if(!pgnMoves.length){alert('No moves yet!');return;}
 
-  // Piece-square tables for positional scoring (from white's POV, flip for black)
-  const PST={
-    p:[0,0,0,0,0,0,0,0,50,50,50,50,50,50,50,50,10,10,20,30,30,20,10,10,5,5,10,25,25,10,5,5,0,0,0,20,20,0,0,0,5,-5,-10,0,0,-10,-5,5,5,10,10,-20,-20,10,10,5,0,0,0,0,0,0,0,0],
-    n:[-50,-40,-30,-30,-30,-30,-40,-50,-40,-20,0,0,0,0,-20,-40,-30,0,10,15,15,10,0,-30,-30,5,15,20,20,15,5,-30,-30,0,15,20,20,15,0,-30,-30,5,10,15,15,10,5,-30,-40,-20,0,5,5,0,-20,-40,-50,-40,-30,-30,-30,-30,-40,-50],
-    b:[-20,-10,-10,-10,-10,-10,-10,-20,-10,0,0,0,0,0,0,-10,-10,0,5,10,10,5,0,-10,-10,5,5,10,10,5,5,-10,-10,0,10,10,10,10,0,-10,-10,10,10,10,10,10,10,-10,-10,5,0,0,0,0,5,-10,-20,-10,-10,-10,-10,-10,-10,-20],
-    r:[0,0,0,0,0,0,0,0,5,10,10,10,10,10,10,5,-5,0,0,0,0,0,0,-5,-5,0,0,0,0,0,0,-5,-5,0,0,0,0,0,0,-5,-5,0,0,0,0,0,0,-5,-5,0,0,0,0,0,0,-5,0,0,0,5,5,0,0,0],
-    q:[-20,-10,-10,-5,-5,-10,-10,-20,-10,0,0,0,0,0,0,-10,-10,0,5,5,5,5,0,-10,-5,0,5,5,5,5,0,-5,0,0,5,5,5,5,0,-5,-10,5,5,5,5,5,0,-10,-10,0,5,0,0,0,0,-10,-20,-10,-10,-5,-5,-10,-10,-20],
-    k:[-30,-40,-40,-50,-50,-40,-40,-30,-30,-40,-40,-50,-50,-40,-40,-30,-30,-40,-40,-50,-50,-40,-40,-30,-30,-40,-40,-50,-50,-40,-40,-30,-20,-30,-30,-40,-40,-30,-30,-20,-10,-20,-20,-20,-20,-20,-20,-10,20,20,0,0,0,0,20,20,20,30,10,0,0,10,30,20]
+    // Determine result
+    let result='*'; // in progress
+    if(turn==='done'){
+      const lastMove=pgnMoves[pgnMoves.length-1]||'';
+      if(lastMove.endsWith('#')){
+        // Checkmate — whoever just moved won
+        result=pgnMoves.length%2===1?'1-0':'0-1'; // odd = white's move was last
+      } else {
+        result='1/2-1/2'; // stalemate
+      }
+    }
+
+    const whiteName=gameMode==='pvp'?'Player 1':gameMode==='bvb'?`White Bot (${bvbDiff.w})`:'Human';
+    const blackName=gameMode==='pvp'?'Player 2':gameMode==='bvb'?`Black Bot (${bvbDiff.b})`:'Bot';
+
+    let pgn='[Event "Arcade Hub Chess"]\n';
+    pgn+='[Site "Arcade Hub"]\n';
+    pgn+=`[Date "${new Date().toISOString().slice(0,10).replace(/-/g,'.')}"]\n`;
+    pgn+='[Round "1"]\n';
+    pgn+=`[White "${whiteName}"]\n`;
+    pgn+=`[Black "${blackName}"]\n`;
+    pgn+=`[Result "${result}"]\n\n`;
+
+    // Format moves: "1. e4 e5 2. Nf3 Nc6 ..."
+    let moveText='';
+    for(let i=0;i<pgnMoves.length;i++){
+      if(i%2===0)moveText+=`${Math.floor(i/2)+1}. `;
+      moveText+=pgnMoves[i]+' ';
+    }
+    moveText+=result;
+    pgn+=moveText.trim();
+
+    if(navigator.clipboard){
+      navigator.clipboard.writeText(pgn).then(()=>{
+        alert('PGN copied! ✅\n\nPaste at:\n• chess.com/analysis\n• lichess.org/paste\n• any PGN viewer');
+      }).catch(()=>prompt('Copy this PGN:',pgn));
+    } else {
+      prompt('Copy this PGN:',pgn);
+    }
   };
 
-  // Evaluate board from black's perspective (black wants high score)
-  function evaluate(b){
-    let score=0;
-    for(let i=0;i<64;i++){
-      const p=b[i];if(!p)continue;
-      const pt=p.toLowerCase();
-      const base=VALS[pt]||0;
-      const r=Math.floor(i/8),c=i%8;
-      // PST index: white uses normal, black uses mirrored row
-      const pstIdx=isW(p)?(7-r)*8+c:r*8+c;
-      const positional=(PST[pt]?PST[pt][pstIdx]:0);
-      if(isB(p))score+=base+positional;
-      else score-=base+positional;
-    }
-    return score;
-  }
-
-  // Minimax with alpha-beta pruning
-  function minimax(b,depth,alpha,beta,maximizing){
-    if(depth===0)return{score:evaluate(b)};
-
-    const side=maximizing; // true=black's turn (maximizing), false=white's turn (minimizing)
-    // Collect all moves for this side
-    const moves=[];
-    for(let i=0;i<64;i++){
-      const p=b[i];if(!p)continue;
-      if(side?!isB(p):!isW(p))continue;
-      getLegalMoves(b,i).forEach(to=>moves.push({fr:i,to}));
-    }
-    if(moves.length===0){
-      // No moves — checkmate or stalemate
-      if(isInCheck(b,!side))return{score:maximizing?-99999:99999};
-      return{score:0};
-    }
-
-    // Move ordering: captures first (improves pruning)
-    moves.sort((a,z)=>(b[z.to]?1:0)-(b[a.to]?1:0));
-
-    let best=maximizing?-Infinity:Infinity;
-    let bestMove=moves[0];
-    for(const mv of moves){
-      const nb=[...b];
-      nb[mv.to]=nb[mv.fr];nb[mv.fr]=null;
-      // Auto-promote to queen for evaluation
-      if(nb[mv.to]==='p'&&Math.floor(mv.to/8)===7)nb[mv.to]='q';
-      if(nb[mv.to]==='P'&&Math.floor(mv.to/8)===0)nb[mv.to]='Q';
-      const res=minimax(nb,depth-1,alpha,beta,!maximizing);
-      if(maximizing){
-        if(res.score>best){best=res.score;bestMove=mv;}
-        alpha=Math.max(alpha,best);
-      } else {
-        if(res.score<best){best=res.score;bestMove=mv;}
-        beta=Math.min(beta,best);
-      }
-      if(beta<=alpha)break; // prune
-    }
-    return{score:best,move:bestMove};
-  }
-
-  function botMv(){
-    if(turn==='done')return;
-
-    let bf=-1,bt=-1;
-
-    if(chessDiff==='easy'){
-      // Easy: greedy material + slight check bonus + noise (original behaviour)
-      let bestScore=-9999;
-      for(let i=0;i<64;i++){
-        if(!board[i]||!isB(board[i]))continue;
-        getLegalMoves(board,i).forEach(to=>{
-          let sc=(board[to]?VALS[board[to].toLowerCase()]:0)+Math.random()*50;
-          const nb=[...board];nb[to]=nb[i];nb[i]=null;
-          if(isInCheck(nb,true))sc+=40;
-          if(sc>bestScore){bestScore=sc;bf=i;bt=to;}
-        });
-      }
-      finishBotMv(bf,bt);
-    } else {
-      // Hard: minimax depth 3 — wrap in setTimeout so "Thinking..." renders first
-      render();setSt('🧠 Thinking...');
-      setTimeout(()=>{
-        const result=minimax(board,3,-Infinity,Infinity,true);
-        if(result.move){bf=result.move.fr;bt=result.move.to;}
-        finishBotMv(bf,bt);
-      },30);
-    }
-  }
-
-  function finishBotMv(bf,bt){
-    if(bf<0){
-      const end=checkEnd(board,false);
-      turn='done';render();
-      setSt(end||'Stalemate — Draw 🤝');
-      gameLog('Chess',end?.includes('You win')?'Win':'Draw',end||'Stalemate');
-      return;
-    }
-    hist.push({b:[...board],t:turn});
-    mkMv(board,bf,bt);
-    if(board[bt]==='p'&&Math.floor(bt/8)===7)board[bt]='q';
-    if(!board.includes('K')){turn='done';render();setSt('Checkmate — Bot wins! 👑');gameLog('Chess','Loss','King captured');return;}
-    const end=checkEnd(board,true);
-    if(end&&(end.includes('Checkmate')||end.includes('Stalemate'))){
-      turn='done';render();setSt(end);
-      gameLog('Chess',end.includes('You win')?'Win':end.includes('Stalemate')?'Draw':'Loss',end);
-      return;
-    }
-    turn='w';render();setSt(end||'White to move');
-  }
-
   function render(){
-    const el=document.getElementById('chess-board');if(!el)return;
-    el.innerHTML='';
-    const legalMvs=sel!==null?getLegalMoves(board,sel):[];
-    const wkIdx=board.indexOf('K');
-    const inChk=turn==='w'&&isInCheck(board,true);
+    const el=document.getElementById('chess-board');if(!el)return;el.innerHTML='';
+    const lm=sel!==null?getLegalMoves(board,sel,enPassant,castleRights):[];
+    const wkIdx=board.indexOf('K'),bkIdx=board.indexOf('k');
+    const inChkW=isInCheck(board,true),inChkB=isInCheck(board,false);
     for(let i=0;i<64;i++){
       const r=Math.floor(i/8),c=i%8;
       const d=document.createElement('div');
       d.className='csq '+((r+c)%2===0?'light':'dark');
       if(sel===i)d.classList.add('sel');
-      if(legalMvs.includes(i))d.classList.add('poss');
-      if(inChk&&i===wkIdx)d.style.background='#ff4444';
+      if(lm.includes(i))d.classList.add('poss');
+      if(inChkW&&i===wkIdx)d.style.background='#ff4444';
+      if(inChkB&&i===bkIdx)d.style.background='#ff4444';
+      if(i===enPassant&&lm.includes(i))d.style.outline='2px solid #f59e0b';
       const p=board[i];
-      if(p){
-        const span=document.createElement('span');
-        span.textContent=UNI[p]||p;
-        span.className=isW(p)?'wp':'bp';
-        d.appendChild(span);
-      }
+      if(p){const span=document.createElement('span');span.textContent=UNI[p]||p;span.className=isW(p)?'wp':'bp';d.appendChild(span);}
       d.onclick=()=>clickSq(i);
       el.appendChild(d);
     }
   }
+  stoppers['chess']=()=>{clearTimeout(bvbTimer);};
   chessInit();
 })();
 
