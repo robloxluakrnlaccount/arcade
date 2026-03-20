@@ -7,13 +7,13 @@
 
 <!-- ── PWA / HOME SCREEN ICONS ───────────────────────── -->
 <!-- Favicon -->
-<link rel="icon" type="image/png" sizes="256x256" href="https://apprecs.org/gp/img/icons/webp/200/com.google.android.play.games/EXTJq-e4yS6RPwLWIz5Stt9_2qfhZGZBujwZ4DBgmPo-icon"/>
+<link rel="icon" type="image/png" sizes="256x256" href="https://cdn-icons-png.flaticon.com/256/720/720284.png"/>
 
 <!-- iOS / iPadOS: Add to Home Screen icon -->
 <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/256/720/720284.png"/>
-<link rel="apple-touch-icon" sizes="152x152" href="https://apprecs.org/gp/img/icons/webp/200/com.google.android.play.games/EXTJq-e4yS6RPwLWIz5Stt9_2qfhZGZBujwZ4DBgmPo-icon"/>
-<link rel="apple-touch-icon" sizes="167x167" href="https://apprecs.org/gp/img/icons/webp/200/com.google.android.play.games/EXTJq-e4yS6RPwLWIz5Stt9_2qfhZGZBujwZ4DBgmPo-icon"/>
-<link rel="apple-touch-icon" sizes="180x180" href="https://apprecs.org/gp/img/icons/webp/200/com.google.android.play.games/EXTJq-e4yS6RPwLWIz5Stt9_2qfhZGZBujwZ4DBgmPo-icon"/>
+<link rel="apple-touch-icon" sizes="152x152" href="https://cdn-icons-png.flaticon.com/256/720/720284.png"/>
+<link rel="apple-touch-icon" sizes="167x167" href="https://cdn-icons-png.flaticon.com/256/720/720284.png"/>
+<link rel="apple-touch-icon" sizes="180x180" href="https://cdn-icons-png.flaticon.com/256/720/720284.png"/>
 
 <!-- iOS full-screen web app -->
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -23,7 +23,7 @@
 <!-- Android / Samsung / Chrome: Web App Manifest (inline as data URI so single-file works) -->
 <link rel="manifest" href="data:application/manifest+json,{
   %22name%22:%22Arcade Hub%22,
-  %22short_name%22:%22Arcade%22,
+  %22short_name%22:%22ArcadeHub%22,
   %22description%22:%2230 games in one app%22,
   %22start_url%22:%22.%22,
   %22display%22:%22standalone%22,
@@ -1016,6 +1016,11 @@ body.touch .sdc{width:38px;height:38px;font-size:15px;}
   <div class="gc">
     <div class="gtitle">♟️ Chess vs Bot</div>
     <div class="sbar" id="chess-status">White to move</div>
+    <div style="display:flex;gap:6px;align-items:center;font-size:12px;color:var(--text2);">
+      Bot:
+      <button id="chess-easy" class="chip on" onclick="setChessDiff('easy')">Easy</button>
+      <button id="chess-hard" class="chip" onclick="setChessDiff('hard')">Hard 🧠</button>
+    </div>
     <div id="chess-board"></div>
     <div id="promo-overlay">
       <div class="promo-box">
@@ -2221,19 +2226,117 @@ function filterGames(q){
     }
   }
 
+  // ── DIFFICULTY ───────────────────────────────────────
+  let chessDiff='easy';
+  window.setChessDiff=function(d){
+    chessDiff=d;
+    document.getElementById('chess-easy').classList.toggle('on',d==='easy');
+    document.getElementById('chess-hard').classList.toggle('on',d==='hard');
+    chessInit();
+  };
+
+  // Piece values
+  const VALS={p:100,n:320,b:330,r:500,q:900,k:20000};
+
+  // Piece-square tables for positional scoring (from white's POV, flip for black)
+  const PST={
+    p:[0,0,0,0,0,0,0,0,50,50,50,50,50,50,50,50,10,10,20,30,30,20,10,10,5,5,10,25,25,10,5,5,0,0,0,20,20,0,0,0,5,-5,-10,0,0,-10,-5,5,5,10,10,-20,-20,10,10,5,0,0,0,0,0,0,0,0],
+    n:[-50,-40,-30,-30,-30,-30,-40,-50,-40,-20,0,0,0,0,-20,-40,-30,0,10,15,15,10,0,-30,-30,5,15,20,20,15,5,-30,-30,0,15,20,20,15,0,-30,-30,5,10,15,15,10,5,-30,-40,-20,0,5,5,0,-20,-40,-50,-40,-30,-30,-30,-30,-40,-50],
+    b:[-20,-10,-10,-10,-10,-10,-10,-20,-10,0,0,0,0,0,0,-10,-10,0,5,10,10,5,0,-10,-10,5,5,10,10,5,5,-10,-10,0,10,10,10,10,0,-10,-10,10,10,10,10,10,10,-10,-10,5,0,0,0,0,5,-10,-20,-10,-10,-10,-10,-10,-10,-20],
+    r:[0,0,0,0,0,0,0,0,5,10,10,10,10,10,10,5,-5,0,0,0,0,0,0,-5,-5,0,0,0,0,0,0,-5,-5,0,0,0,0,0,0,-5,-5,0,0,0,0,0,0,-5,-5,0,0,0,0,0,0,-5,0,0,0,5,5,0,0,0],
+    q:[-20,-10,-10,-5,-5,-10,-10,-20,-10,0,0,0,0,0,0,-10,-10,0,5,5,5,5,0,-10,-5,0,5,5,5,5,0,-5,0,0,5,5,5,5,0,-5,-10,5,5,5,5,5,0,-10,-10,0,5,0,0,0,0,-10,-20,-10,-10,-5,-5,-10,-10,-20],
+    k:[-30,-40,-40,-50,-50,-40,-40,-30,-30,-40,-40,-50,-50,-40,-40,-30,-30,-40,-40,-50,-50,-40,-40,-30,-30,-40,-40,-50,-50,-40,-40,-30,-20,-30,-30,-40,-40,-30,-30,-20,-10,-20,-20,-20,-20,-20,-20,-10,20,20,0,0,0,0,20,20,20,30,10,0,0,10,30,20]
+  };
+
+  // Evaluate board from black's perspective (black wants high score)
+  function evaluate(b){
+    let score=0;
+    for(let i=0;i<64;i++){
+      const p=b[i];if(!p)continue;
+      const pt=p.toLowerCase();
+      const base=VALS[pt]||0;
+      const r=Math.floor(i/8),c=i%8;
+      // PST index: white uses normal, black uses mirrored row
+      const pstIdx=isW(p)?(7-r)*8+c:r*8+c;
+      const positional=(PST[pt]?PST[pt][pstIdx]:0);
+      if(isB(p))score+=base+positional;
+      else score-=base+positional;
+    }
+    return score;
+  }
+
+  // Minimax with alpha-beta pruning
+  function minimax(b,depth,alpha,beta,maximizing){
+    if(depth===0)return{score:evaluate(b)};
+
+    const side=maximizing; // true=black's turn (maximizing), false=white's turn (minimizing)
+    // Collect all moves for this side
+    const moves=[];
+    for(let i=0;i<64;i++){
+      const p=b[i];if(!p)continue;
+      if(side?!isB(p):!isW(p))continue;
+      getLegalMoves(b,i).forEach(to=>moves.push({fr:i,to}));
+    }
+    if(moves.length===0){
+      // No moves — checkmate or stalemate
+      if(isInCheck(b,!side))return{score:maximizing?-99999:99999};
+      return{score:0};
+    }
+
+    // Move ordering: captures first (improves pruning)
+    moves.sort((a,z)=>(b[z.to]?1:0)-(b[a.to]?1:0));
+
+    let best=maximizing?-Infinity:Infinity;
+    let bestMove=moves[0];
+    for(const mv of moves){
+      const nb=[...b];
+      nb[mv.to]=nb[mv.fr];nb[mv.fr]=null;
+      // Auto-promote to queen for evaluation
+      if(nb[mv.to]==='p'&&Math.floor(mv.to/8)===7)nb[mv.to]='q';
+      if(nb[mv.to]==='P'&&Math.floor(mv.to/8)===0)nb[mv.to]='Q';
+      const res=minimax(nb,depth-1,alpha,beta,!maximizing);
+      if(maximizing){
+        if(res.score>best){best=res.score;bestMove=mv;}
+        alpha=Math.max(alpha,best);
+      } else {
+        if(res.score<best){best=res.score;bestMove=mv;}
+        beta=Math.min(beta,best);
+      }
+      if(beta<=alpha)break; // prune
+    }
+    return{score:best,move:bestMove};
+  }
+
   function botMv(){
     if(turn==='done')return;
-    const vals={p:1,n:3,b:3,r:5,q:9,k:100};
-    let bestScore=-9999,bf=-1,bt=-1;
-    for(let i=0;i<64;i++){
-      if(!board[i]||!isB(board[i]))continue;
-      getLegalMoves(board,i).forEach(to=>{
-        let sc=(board[to]?vals[board[to].toLowerCase()]:0)+Math.random()*0.4;
-        const nb=[...board];nb[to]=nb[i];nb[i]=null;
-        if(isInCheck(nb,true))sc+=0.5;
-        if(sc>bestScore){bestScore=sc;bf=i;bt=to;}
-      });
+
+    let bf=-1,bt=-1;
+
+    if(chessDiff==='easy'){
+      // Easy: greedy material + slight check bonus + noise (original behaviour)
+      let bestScore=-9999;
+      for(let i=0;i<64;i++){
+        if(!board[i]||!isB(board[i]))continue;
+        getLegalMoves(board,i).forEach(to=>{
+          let sc=(board[to]?VALS[board[to].toLowerCase()]:0)+Math.random()*50;
+          const nb=[...board];nb[to]=nb[i];nb[i]=null;
+          if(isInCheck(nb,true))sc+=40;
+          if(sc>bestScore){bestScore=sc;bf=i;bt=to;}
+        });
+      }
+      finishBotMv(bf,bt);
+    } else {
+      // Hard: minimax depth 3 — wrap in setTimeout so "Thinking..." renders first
+      render();setSt('🧠 Thinking...');
+      setTimeout(()=>{
+        const result=minimax(board,3,-Infinity,Infinity,true);
+        if(result.move){bf=result.move.fr;bt=result.move.to;}
+        finishBotMv(bf,bt);
+      },30);
     }
+  }
+
+  function finishBotMv(bf,bt){
     if(bf<0){
       const end=checkEnd(board,false);
       turn='done';render();
@@ -2243,7 +2346,6 @@ function filterGames(q){
     }
     hist.push({b:[...board],t:turn});
     mkMv(board,bf,bt);
-    // Bot always promotes to queen (optimal)
     if(board[bt]==='p'&&Math.floor(bt/8)===7)board[bt]='q';
     if(!board.includes('K')){turn='done';render();setSt('Checkmate — Bot wins! 👑');gameLog('Chess','Loss','King captured');return;}
     const end=checkEnd(board,true);
