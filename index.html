@@ -867,7 +867,7 @@ body.touch .sdc{width:38px;height:38px;font-size:15px;}
   <div class="gc">
     <div class="gtitle">🐍 Snake</div>
     <div class="sbar">Score: <span id="sn-score">0</span>&nbsp;&nbsp;Best: <span id="sn-best">0</span></div>
-    <canvas id="snake-canvas" width="360" height="360" style="border-radius:var(--r8);border:1px solid var(--border);"></canvas>
+    <canvas id="snake-canvas" width="360" height="360" style="border-radius:var(--r8);border:1px solid var(--border);display:block;"></canvas>
     <div class="hint hint-keyboard">WASD / Arrows · Swipe on mobile</div>
     <div class="touch-controls" id="snake-tc">
       <div class="tc-row"><div class="tc-btn" id="snk-up" ontouchstart="snkBtn('up',true)" ontouchend="snkBtn('up',false)">↑</div></div>
@@ -950,12 +950,15 @@ body.touch .sdc{width:38px;height:38px;font-size:15px;}
     <div class="sbar">Score: <span id="ast-score">0</span>&nbsp;&nbsp;Lives: <span id="ast-lives">3</span></div>
     <canvas id="ast-canvas" width="480" height="380" style="border:1px solid var(--border);border-radius:var(--r8);"></canvas>
     <div class="hint hint-keyboard">WASD / Arrows move · Space shoot</div>
-    <div class="touch-controls">
-      <div class="tc-row">
-        <div class="tc-btn" id="ast-left" ontouchstart="astKey('left',true)" ontouchend="astKey('left',false)">←</div>
-        <div class="tc-btn" id="ast-up" ontouchstart="astKey('up',true)" ontouchend="astKey('up',false)">↑</div>
-        <div class="tc-btn" id="ast-right" ontouchstart="astKey('right',true)" ontouchend="astKey('right',false)">→</div>
-        <div class="tc-btn tc-shoot wide" id="ast-fire" ontouchstart="astKey('fire',true)" ontouchend="astKey('fire',false)">💥 Fire</div>
+    <div class="touch-controls" id="ast-touch-controls">
+      <div style="display:flex;gap:20px;align-items:center;justify-content:center;width:100%;">
+        <!-- Thumbstick -->
+        <div id="ast-stick-wrap" style="position:relative;width:90px;height:90px;flex-shrink:0;">
+          <div id="ast-stick-base" style="position:absolute;inset:0;border-radius:50%;background:rgba(0,0,0,.18);border:2px solid rgba(255,255,255,.2);"></div>
+          <div id="ast-stick-knob" style="position:absolute;width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,.35);border:2px solid rgba(255,255,255,.5);top:50%;left:50%;transform:translate(-50%,-50%);pointer-events:none;"></div>
+        </div>
+        <!-- Fire button -->
+        <div id="ast-fire-btn" class="tc-btn tc-shoot" style="width:64px;height:64px;border-radius:50%;font-size:24px;flex-shrink:0;">💥</div>
       </div>
     </div>
     <div class="overlay" id="ast-ov"><h3>🚀 Asteroids</h3><p>Shoot the rocks!</p><button class="btn-fab" onclick="astStart()">▶ Start</button></div>
@@ -1384,65 +1387,250 @@ function filterGames(q){
 
 // ── SNAKE ────────────────────────────────────────────
 (function(){
-  const CELL=20,COLS=18,ROWS=18;
-  let snake,dir,food,loop,score,best=0,running=false,pending=null;
+  const COLS=20,ROWS=20,CELL=18,SPEED=130; // ms per move
+  let snake,dir,food,score,best=0,running=false,pending=null;
+  let raf,lastTick=0,progress=0; // progress 0-1 between ticks for smooth interpolation
+  let particles=[],foodPulse=0,foodScale=1;
+  let prevSnake=[]; // snapshot before current tick for interpolation
+
   function snakeStart(){
     document.getElementById('snake-ov').style.display='none';
-    snake=[{x:9,y:9},{x:8,y:9},{x:7,y:9}];
-    dir={x:1,y:0};pending=null;score=0;placeFood();running=true;
-    clearInterval(loop);loop=setInterval(tick,120);
+    snake=[{x:10,y:10},{x:9,y:10},{x:8,y:10},{x:7,y:10}];
+    prevSnake=snake.map(s=>({...s}));
+    dir={x:1,y:0};pending=null;score=0;particles=[];foodPulse=0;
+    placeFood();running=true;lastTick=0;progress=0;
+    cancelAnimationFrame(raf);raf=requestAnimationFrame(loop);
+    document.getElementById('sn-score').textContent=0;
   }
   window.snakeStart=snakeStart;
+
   function placeFood(){
     do{food={x:Math.floor(Math.random()*COLS),y:Math.floor(Math.random()*ROWS)};}
     while(snake.some(s=>s.x===food.x&&s.y===food.y));
+    foodScale=0.5; // animate in
   }
+
   function tick(){
-    if(pending){dir=pending;pending=null;}
+    if(pending){
+      if(!(pending.x===-dir.x&&pending.y===-dir.y))dir=pending;
+      pending=null;
+    }
+    prevSnake=snake.map(s=>({...s}));
     const head={x:snake[0].x+dir.x,y:snake[0].y+dir.y};
+    // Wall collision
     if(head.x<0||head.x>=COLS||head.y<0||head.y>=ROWS||snake.some(s=>s.x===head.x&&s.y===head.y)){
-      clearInterval(loop);running=false;
-      const ov=document.getElementById('snake-ov');
-      ov.innerHTML=`<h3>Game Over</h3><p>Score: ${score}</p><button class="btn-fab" onclick="snakeStart()">▶ Retry</button>`;
-      gameLog('Snake','Loss',`Score: ${score}`);
-      ov.style.display='flex';return;
+      running=false;
+      setTimeout(()=>{
+        const ov=document.getElementById('snake-ov');
+        ov.innerHTML=`<h3>Game Over</h3><p>Score: ${score}</p><button class="btn-fab" onclick="snakeStart()">▶ Retry</button>`;
+        ov.style.display='flex';
+        gameLog('Snake','Loss',`Score: ${score}`);
+      },200);
+      return;
     }
     snake.unshift(head);
     if(head.x===food.x&&head.y===food.y){
       score+=10;if(score>best)best=score;
       document.getElementById('sn-score').textContent=score;
       document.getElementById('sn-best').textContent=best;
+      // Burst particles
+      for(let i=0;i<12;i++){
+        const a=Math.random()*Math.PI*2;
+        const spd=1.5+Math.random()*3;
+        particles.push({x:food.x*CELL+CELL/2,y:food.y*CELL+CELL/2,vx:Math.cos(a)*spd,vy:Math.sin(a)*spd,life:1,size:3+Math.random()*3});
+      }
       placeFood();
-    }else snake.pop();
-    draw();
+    } else {
+      snake.pop();
+    }
   }
-  function draw(){
+
+  function loop(ts){
+    if(!running){draw(1);return;}
+    raf=requestAnimationFrame(loop);
+    if(!lastTick)lastTick=ts;
+    const elapsed=ts-lastTick;
+    progress=Math.min(elapsed/SPEED,1);
+    if(progress>=1){lastTick=ts+(elapsed-SPEED);tick();progress=0;}
+    // Animate food pulse
+    foodPulse+=0.08;
+    foodScale=Math.min(1,foodScale+0.08); // grow in
+    // Update particles
+    particles=particles.filter(p=>{p.x+=p.vx;p.y+=p.vy;p.vx*=0.88;p.vy*=0.88;p.life-=0.05;return p.life>0;});
+    draw(progress);
+  }
+
+  function lerp(a,b,t){return a+(b-a)*t;}
+
+  // Get the direction vector from seg a to seg b
+  function segDir(a,b){
+    if(!a||!b)return{x:1,y:0};
+    const dx=a.x-b.x,dy=a.y-b.y;
+    // Normalise (handle wrap-around)
+    const ax=Math.abs(dx)>1?-Math.sign(dx):dx;
+    const ay=Math.abs(dy)>1?-Math.sign(dy):dy;
+    return{x:ax,y:ay};
+  }
+
+  function draw(t){
     const cv=document.getElementById('snake-canvas');if(!cv)return;
     const ctx=cv.getContext('2d');
-    ctx.fillStyle='#1a1a2e';ctx.fillRect(0,0,cv.width,cv.height);
-    ctx.fillStyle='#ff4d4d';ctx.beginPath();ctx.arc(food.x*CELL+CELL/2,food.y*CELL+CELL/2,CELL/2-2,0,Math.PI*2);ctx.fill();
-    snake.forEach((s,i)=>{
-      const t=i/Math.max(snake.length-1,1);
-      ctx.fillStyle=`hsl(${142-t*20},70%,${42-t*12}%)`;
-      ctx.beginPath();ctx.roundRect(s.x*CELL+1,s.y*CELL+1,CELL-2,CELL-2,3);ctx.fill();
+    const W=cv.width,H=cv.height;
+
+    // Grass checkerboard background like Google Snake
+    for(let y=0;y<ROWS;y++){
+      for(let x=0;x<COLS;x++){
+        ctx.fillStyle=(x+y)%2===0?'#aad751':'#a2d149';
+        ctx.fillRect(x*CELL,y*CELL,CELL,CELL);
+      }
+    }
+
+    // Food — glowing apple (keep as-is)
+    if(food){
+      const fx=food.x*CELL+CELL/2,fy=food.y*CELL+CELL/2;
+      const pulse=Math.sin(foodPulse)*0.12+0.88;
+      const r=(CELL/2-1)*pulse*foodScale;
+      const glow=ctx.createRadialGradient(fx,fy,0,fx,fy,r*2.5);
+      glow.addColorStop(0,'rgba(255,60,60,0.4)');glow.addColorStop(1,'rgba(255,60,60,0)');
+      ctx.fillStyle=glow;ctx.beginPath();ctx.arc(fx,fy,r*2.5,0,Math.PI*2);ctx.fill();
+      const grad=ctx.createRadialGradient(fx-r*0.3,fy-r*0.3,0,fx,fy,r);
+      grad.addColorStop(0,'#ff8a80');grad.addColorStop(0.6,'#ff1744');grad.addColorStop(1,'#b71c1c');
+      ctx.fillStyle=grad;ctx.beginPath();ctx.arc(fx,fy,r,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle='rgba(255,255,255,0.4)';
+      ctx.beginPath();ctx.ellipse(fx-r*0.28,fy-r*0.3,r*0.25,r*0.16,-0.5,0,Math.PI*2);ctx.fill();
+      ctx.strokeStyle='#66bb6a';ctx.lineWidth=1.5;ctx.lineCap='round';
+      ctx.beginPath();ctx.moveTo(fx+1,fy-r);ctx.quadraticCurveTo(fx+r*0.6,fy-r*1.5,fx+r*0.4,fy-r*1.2);ctx.stroke();
+    }
+
+    // Particles
+    particles.forEach(p=>{
+      ctx.globalAlpha=p.life;
+      ctx.fillStyle='#ff5252';
+      ctx.beginPath();ctx.arc(p.x,p.y,p.size*p.life,0,Math.PI*2);ctx.fill();
     });
+    ctx.globalAlpha=1;
+
+    if(snake.length===0)return;
+
+    // Interpolated positions
+    const pts=snake.map((seg,i)=>{
+      const prev=prevSnake[i]||seg;
+      const dx=seg.x-prev.x,dy=seg.y-prev.y;
+      if(Math.abs(dx)>1||Math.abs(dy)>1)return{x:seg.x*CELL+CELL/2,y:seg.y*CELL+CELL/2};
+      return{x:lerp(prev.x,seg.x,t)*CELL+CELL/2,y:lerp(prev.y,seg.y,t)*CELL+CELL/2};
+    });
+
+    const R=CELL/2-0.5;
+    const BLUE='#4a90d9';
+    const BLUE_DARK='#3a7bc8';
+    const BLUE_LIGHT='#6aaee8';
+    const BLUE_BELLY='#85c1f5';
+
+    // ── 1. Drop shadow pass ─────────────────────────────
+    ctx.strokeStyle='rgba(0,0,0,0.18)';
+    ctx.lineWidth=R*2+5;ctx.lineJoin='round';ctx.lineCap='round';
+    ctx.beginPath();ctx.moveTo(pts[0].x,pts[0].y+3);
+    for(let i=1;i<pts.length;i++)ctx.lineTo(pts[i].x,pts[i].y+3);
+    ctx.stroke();
+
+    // ── 2. Main body stroke ─────────────────────────────
+    ctx.strokeStyle=BLUE_DARK;
+    ctx.lineWidth=R*2;ctx.lineJoin='round';ctx.lineCap='round';
+    ctx.beginPath();ctx.moveTo(pts[0].x,pts[0].y);
+    for(let i=1;i<pts.length;i++)ctx.lineTo(pts[i].x,pts[i].y);
+    ctx.stroke();
+
+    // ── 3. Lighter top highlight stripe ─────────────────
+    ctx.strokeStyle=BLUE;
+    ctx.lineWidth=R*1.3;ctx.lineJoin='round';ctx.lineCap='round';
+    ctx.beginPath();ctx.moveTo(pts[0].x,pts[0].y);
+    for(let i=1;i<pts.length;i++)ctx.lineTo(pts[i].x,pts[i].y);
+    ctx.stroke();
+
+    // ── 4. Segment dividers — subtle dark rings ──────────
+    for(let i=1;i<pts.length-1;i++){
+      ctx.strokeStyle='rgba(40,90,170,0.45)';
+      ctx.lineWidth=2;
+      ctx.beginPath();ctx.arc(pts[i].x,pts[i].y,R-1,0,Math.PI*2);ctx.stroke();
+    }
+
+    // ── 5. Belly highlight on each segment ───────────────
+    ctx.fillStyle=BLUE_BELLY;
+    for(let i=1;i<pts.length;i++){
+      // Direction this segment faces (towards head)
+      const ddx=pts[i-1].x-pts[i].x,ddy=pts[i-1].y-pts[i].y;
+      const len=Math.hypot(ddx,ddy)||1;
+      const nx=-ddy/len,ny=ddx/len; // perpendicular
+      const bx=pts[i].x+nx*R*0.3,by=pts[i].y+ny*R*0.3;
+      ctx.beginPath();ctx.ellipse(bx,by,R*0.45,R*0.22,Math.atan2(ddy,ddx),0,Math.PI*2);
+      ctx.fill();
+    }
+
+    // ── 6. Head ──────────────────────────────────────────
+    const hd=pts[0];
+    const headR=R+2.5;
+
+    // Head base
+    ctx.fillStyle=BLUE_DARK;
+    ctx.beginPath();ctx.arc(hd.x,hd.y,headR+1,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle=BLUE;
+    ctx.beginPath();ctx.arc(hd.x,hd.y,headR,0,Math.PI*2);ctx.fill();
+
+    // Head highlight
+    ctx.fillStyle=BLUE_LIGHT;
+    ctx.beginPath();ctx.ellipse(hd.x-dir.x*headR*0.1,hd.y-dir.y*headR*0.1,headR*0.65,headR*0.45,-Math.atan2(dir.y,dir.x),0,Math.PI*2);
+    ctx.fill();
+    ctx.fillStyle=BLUE;
+    ctx.beginPath();ctx.arc(hd.x,hd.y,headR,0,Math.PI*2);
+    ctx.globalAlpha=0.3;ctx.fill();ctx.globalAlpha=1;
+
+    // White eye sockets
+    const eyeOff=headR*0.42;
+    const ex1=hd.x+dir.y*eyeOff+dir.x*headR*0.3;
+    const ey1=hd.y-dir.x*eyeOff+dir.y*headR*0.3;
+    const ex2=hd.x-dir.y*eyeOff+dir.x*headR*0.3;
+    const ey2=hd.y+dir.x*eyeOff+dir.y*headR*0.3;
+    ctx.fillStyle='#fff';
+    ctx.beginPath();ctx.arc(ex1,ey1,3.5,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(ex2,ey2,3.5,0,Math.PI*2);ctx.fill();
+    // Pupils
+    ctx.fillStyle='#1a1a2e';
+    ctx.beginPath();ctx.arc(ex1+dir.x*1.2,ey1+dir.y*1.2,1.8,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(ex2+dir.x*1.2,ey2+dir.y*1.2,1.8,0,Math.PI*2);ctx.fill();
+    // Eye shine
+    ctx.fillStyle='rgba(255,255,255,0.8)';
+    ctx.beginPath();ctx.arc(ex1+dir.x*0.6-dir.y*0.8,ey1+dir.y*0.6+dir.x*0.8,0.9,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(ex2+dir.x*0.6-dir.y*0.8,ey2+dir.y*0.6+dir.x*0.8,0.9,0,Math.PI*2);ctx.fill();
+
+    // Tongue flicker
+    if(Math.floor(Date.now()/350)%3!==2){
+      const tlx=hd.x+dir.x*(headR+2),tly=hd.y+dir.y*(headR+2);
+      const tEx=hd.x+dir.x*(headR+7),tEy=hd.y+dir.y*(headR+7);
+      ctx.strokeStyle='#e91e63';ctx.lineWidth=1.5;ctx.lineCap='round';
+      ctx.beginPath();ctx.moveTo(hd.x+dir.x*headR,hd.y+dir.y*headR);ctx.lineTo(tlx,tly);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(tlx,tly);ctx.lineTo(tEx+dir.y*3,tEy-dir.x*3);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(tlx,tly);ctx.lineTo(tEx-dir.y*3,tEy+dir.x*3);ctx.stroke();
+    }
   }
+
+  // Input
   const KMAP={ArrowUp:{x:0,y:-1},ArrowDown:{x:0,y:1},ArrowLeft:{x:-1,y:0},ArrowRight:{x:1,y:0},w:{x:0,y:-1},s:{x:0,y:1},a:{x:-1,y:0},d:{x:1,y:0},W:{x:0,y:-1},S:{x:0,y:1},A:{x:-1,y:0},D:{x:1,y:0}};
   document.addEventListener('keydown',e=>{
     if(!running||currentGame!=='snake')return;
     const d=KMAP[e.key];
-    if(d&&!(d.x===-dir.x&&d.y===-dir.y)){pending=d;e.preventDefault();}
+    if(d){pending=d;e.preventDefault();}
   });
   let tx,ty;
   document.addEventListener('touchstart',e=>{if(currentGame==='snake'){tx=e.touches[0].clientX;ty=e.touches[0].clientY;}},{passive:true});
   document.addEventListener('touchend',e=>{
     if(currentGame!=='snake'||!running||!tx)return;
     const dx=e.changedTouches[0].clientX-tx,dy=e.changedTouches[0].clientY-ty;
-    if(Math.abs(dx)>Math.abs(dy)){if(dx>20&&dir.x!==-1)pending={x:1,y:0};else if(dx<-20&&dir.x!==1)pending={x:-1,y:0};}
-    else{if(dy>20&&dir.y!==-1)pending={x:0,y:1};else if(dy<-20&&dir.y!==1)pending={x:0,y:-1};}
+    if(Math.abs(dx)>Math.abs(dy)){pending=dx>20?{x:1,y:0}:{x:-1,y:0};}
+    else{pending=dy>20?{x:0,y:1}:{x:0,y:-1};}
     tx=null;
-  });
-  stoppers['snake']=()=>{clearInterval(loop);running=false;document.getElementById('snake-ov').style.display='flex';};
+  },{passive:true});
+
+  stoppers['snake']=()=>{cancelAnimationFrame(raf);running=false;document.getElementById('snake-ov').style.display='flex';};
 })();
 
 // ── TETRIS ───────────────────────────────────────────
@@ -1797,9 +1985,23 @@ function filterGames(q){
     p.y+=(my-p.y)*Math.min(1,dt*14);
     p.y=Math.max(PH/2,Math.min(H-PH/2,p.y));
 
-    // Bot tracks ball with slight delay
-    const botTarget=ball.vx<0?ball.y:H/2;
-    bot.y+=(botTarget-bot.y)*Math.min(1,dt*4.5);
+    // Bot tracks predicted ball landing with reaction delay
+    let botTarget=H/2;
+    if(ball.vx>0){
+      // Predict where ball will be when it reaches bot paddle
+      let px=ball.x,py=ball.y,pvx=ball.vx,pvy=ball.vy;
+      let steps=0;
+      while(px<W-PR-BR&&steps++<200){
+        px+=pvx*0.016;py+=pvy*0.016;
+        if(py<BR){py=BR;pvy=Math.abs(pvy);}
+        if(py>H-BR){py=H-BR;pvy=-Math.abs(pvy);}
+      }
+      botTarget=py;
+    }
+    // Add small reaction error that reduces at higher speeds (harder as game goes)
+    const spd=Math.hypot(ball.vx,ball.vy);
+    const err=(Math.random()-0.5)*Math.max(0,40-spd*0.08);
+    bot.y+=(botTarget+err-bot.y)*Math.min(1,dt*7);
     bot.y=Math.max(PH/2,Math.min(H-PH/2,bot.y));
 
     // Player paddle hit (left)
@@ -2950,11 +3152,20 @@ function filterGames(q){
   const WORDS=['crane','stone','light','power','world','brain','flesh','glory','sword','flame','cloud','storm','night','dream','earth','grave','bloom','sharp','twist','blend','craft','drift','gloom','pulse','ridge','scout','sting','sweep','track','whirl'];
   let target,guesses,current,done;
   const ROWS_KB=[['q','w','e','r','t','y','u','i','o','p'],['a','s','d','f','g','h','j','k','l'],['Enter','z','x','c','v','b','n','m','⌫']];
+  // Extended valid word list for Wordle validation (common 5-letter words)
+
   function wlInit(){target=WORDS[Math.floor(Math.random()*WORDS.length)];guesses=[];current='';done=false;render();document.getElementById('wl-msg').textContent='';}
-  window.wlInit=wlInit;
-  function submit(){if(current.length<5){msg('Need 5 letters');return;}const g=score(current);guesses.push(g);if(current===target){done=true;msg('🎉 Correct!');}else if(guesses.length>=6){done=true;msg('Word: '+target.toUpperCase());}current='';render();}
-  function score(w){return w.split('').map((l,i)=>({l,s:l===target[i]?'correct':target.includes(l)?'present':'absent'}));}
   function msg(t){document.getElementById('wl-msg').textContent=t;}
+  function submit(){
+    if(current.length<5){msg('Need 5 letters');return;}
+    const word=current.toLowerCase();
+    const g=score(word);guesses.push(g);
+    if(word===target){done=true;msg('🎉 Correct!');}
+    else if(guesses.length>=6){done=true;msg('Word: '+target.toUpperCase());}
+    current='';render();
+  }
+  window.wlInit=wlInit;
+  function score(w){return w.split('').map((l,i)=>({l,s:l===target[i]?'correct':target.includes(l)?'present':'absent'}));}
   function render(){
     const g=document.getElementById('wl-grid');if(!g)return;g.innerHTML='';
     for(let r=0;r<6;r++)for(let c=0;c<5;c++){const d=document.createElement('div');d.className='wl-cell';if(r<guesses.length){d.textContent=guesses[r][c].l.toUpperCase();d.classList.add(guesses[r][c].s);}else if(r===guesses.length&&!done){const ch=current[c]||'';d.textContent=ch;if(ch)d.classList.add('current');}g.appendChild(d);}
@@ -2962,7 +3173,7 @@ function filterGames(q){
     const st={};guesses.forEach(g=>g.forEach(({l,s})=>{if(!st[l]||s==='correct'||(s==='present'&&st[l]!=='correct'))st[l]=s;}));
     ROWS_KB.forEach(row=>{const div=document.createElement('div');div.className='wl-row';row.forEach(k=>{const b=document.createElement('button');b.className='kkey '+(st[k]||'');b.textContent=k.toUpperCase();b.style.minWidth=k.length>1?'48px':'30px';b.onclick=()=>kbClick(k);div.appendChild(b);});kb.appendChild(div);});
   }
-  function kbClick(k){if(done)return;if(k==='Enter')submit();else if(k==='⌫')current=current.slice(0,-1);else if(current.length<5)current+=k;render();}
+  function kbClick(k){if(done)return;if(k==='Enter')submit();else if(k==='⌫')current=current.slice(0,-1);else if(current.length<5)current+=k.toLowerCase();render();}
   document.addEventListener('keydown',e=>{if(currentGame!=='wordle'||done)return;if(e.key==='Enter')submit();else if(e.key==='Backspace')current=current.slice(0,-1);else if(/^[a-zA-Z]$/.test(e.key)&&current.length<5)current+=e.key.toLowerCase();render();});
   wlInit();
 })();
@@ -3461,14 +3672,105 @@ window.tetTouch=function(action){
 };
 
 // ── ASTEROIDS TOUCH BUTTONS ───────────────────────────
-window.astKey=function(dir,pressed){
-  const el=document.getElementById('ast-'+dir);
-  if(el)el.classList.toggle('pressed',pressed);
-  // Simulate keydown/keyup on the keys object used by asteroids
-  const keyMap={left:'ArrowLeft',up:'ArrowUp',right:'ArrowRight',fire:' '};
-  const evtType=pressed?'keydown':'keyup';
-  document.dispatchEvent(new KeyboardEvent(evtType,{key:keyMap[dir],bubbles:true}));
-};
+// ── ASTEROIDS THUMBSTICK ─────────────────────────────
+(function(){
+  const DEADZONE=10, MAX_R=32;
+  let stickActive=false, stickId=null, stickOrigin={x:0,y:0};
+
+  function getAngle(dx,dy){return Math.atan2(dy,dx);} // radians
+
+  function updateStickVisual(dx,dy){
+    const knob=document.getElementById('ast-stick-knob');
+    if(!knob)return;
+    const dist=Math.min(Math.hypot(dx,dy),MAX_R);
+    const ang=Math.atan2(dy,dx);
+    const ox=Math.cos(ang)*dist, oy=Math.sin(ang)*dist;
+    knob.style.transform=`translate(calc(-50% + ${ox}px), calc(-50% + ${oy}px))`;
+  }
+
+  function resetStick(){
+    stickActive=false;stickId=null;
+    updateStickVisual(0,0);
+    document.dispatchEvent(new KeyboardEvent('keyup',{key:'ArrowLeft',bubbles:true}));
+    document.dispatchEvent(new KeyboardEvent('keyup',{key:'ArrowRight',bubbles:true}));
+    document.dispatchEvent(new KeyboardEvent('keyup',{key:'ArrowUp',bubbles:true}));
+  }
+
+  function onStickMove(cx,cy){
+    const dx=cx-stickOrigin.x, dy=cy-stickOrigin.y;
+    const dist=Math.hypot(dx,dy);
+    updateStickVisual(dx,dy);
+    if(dist<DEADZONE){
+      document.dispatchEvent(new KeyboardEvent('keyup',{key:'ArrowLeft',bubbles:true}));
+      document.dispatchEvent(new KeyboardEvent('keyup',{key:'ArrowRight',bubbles:true}));
+      document.dispatchEvent(new KeyboardEvent('keyup',{key:'ArrowUp',bubbles:true}));
+      return;
+    }
+    const ang=Math.atan2(dy,dx); // -π to π
+    // Thrust: up arc (roughly -135° to -45°, i.e. dy strongly negative)
+    // Left: left arc, Right: right arc
+    const deg=ang*(180/Math.PI); // -180 to 180
+    // Rotate: if pointing left half
+    if(dx<-DEADZONE)document.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowLeft',bubbles:true}));
+    else document.dispatchEvent(new KeyboardEvent('keyup',{key:'ArrowLeft',bubbles:true}));
+    if(dx>DEADZONE)document.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true}));
+    else document.dispatchEvent(new KeyboardEvent('keyup',{key:'ArrowRight',bubbles:true}));
+    // Thrust: pointing mostly up
+    if(dy<-DEADZONE)document.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowUp',bubbles:true}));
+    else document.dispatchEvent(new KeyboardEvent('keyup',{key:'ArrowUp',bubbles:true}));
+  }
+
+  document.addEventListener('touchstart',e=>{
+    const wrap=document.getElementById('ast-stick-wrap');
+    if(!wrap)return;
+    for(const t of e.changedTouches){
+      const el=document.elementFromPoint(t.clientX,t.clientY);
+      if(wrap.contains(el)||el===wrap){
+        stickActive=true;stickId=t.identifier;
+        const r=wrap.getBoundingClientRect();
+        stickOrigin={x:r.left+r.width/2,y:r.top+r.height/2};
+        onStickMove(t.clientX,t.clientY);
+        e.preventDefault();
+      }
+    }
+  },{passive:false});
+
+  document.addEventListener('touchmove',e=>{
+    if(!stickActive)return;
+    for(const t of e.changedTouches){
+      if(t.identifier===stickId){onStickMove(t.clientX,t.clientY);e.preventDefault();break;}
+    }
+  },{passive:false});
+
+  document.addEventListener('touchend',e=>{
+    for(const t of e.changedTouches){if(t.identifier===stickId){resetStick();break;}}
+  },{passive:true});
+  document.addEventListener('touchcancel',e=>{
+    for(const t of e.changedTouches){if(t.identifier===stickId){resetStick();break;}}
+  },{passive:true});
+
+  // Fire button
+  document.addEventListener('touchstart',e=>{
+    const btn=document.getElementById('ast-fire-btn');
+    if(!btn)return;
+    for(const t of e.changedTouches){
+      const el=document.elementFromPoint(t.clientX,t.clientY);
+      if(btn.contains(el)||el===btn){
+        document.dispatchEvent(new KeyboardEvent('keydown',{key:' ',bubbles:true}));
+        btn.classList.add('pressed');
+      }
+    }
+  },{passive:true});
+  document.addEventListener('touchend',e=>{
+    const btn=document.getElementById('ast-fire-btn');
+    if(btn)btn.classList.remove('pressed');
+  },{passive:true});
+})();
+
+// Keep old astKey as no-op for safety
+window.astKey=function(){};
+
+
 
 // ── PLATFORMER TOUCH BUTTONS ──────────────────────────
 window.platBtn=function(dir,pressed){
