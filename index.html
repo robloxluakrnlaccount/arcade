@@ -506,56 +506,22 @@ body.touch .hint-keyboard{display:none;}
 .csq img{width:88%;height:88%;display:block;pointer-events:none;}
 .csq{position:relative;}
 
-/* CHESS RESULT OVERLAY */
-#chess-result-overlay{
-  position:absolute;inset:0;
-  background:rgba(0,0,0,.55);
-  display:none;align-items:center;justify-content:center;
-  z-index:60;border-radius:var(--r4);
-  backdrop-filter:blur(3px);
+/* CHESS KING RESULT BADGES */
+@keyframes badge-pop{
+  from{opacity:0;transform:translateX(-50%) scale(0.3);}
+  60%{transform:translateX(-50%) scale(1.15);}
+  to{opacity:1;transform:translateX(-50%) scale(1);}
 }
-#chess-result-overlay.show{display:flex;}
-@keyframes chess-card-in{
-  from{opacity:0;transform:scale(.7) translateY(20px);}
-  to{opacity:1;transform:scale(1) translateY(0);}
+.csq-winner-badge,.csq-loser-badge{
+  position:absolute;bottom:2px;left:50%;
+  transform:translateX(-50%);
+  font-size:9px;font-weight:700;border-radius:20px;
+  padding:2px 5px;white-space:nowrap;pointer-events:none;
+  animation:badge-pop .4s cubic-bezier(.34,1.56,.64,1) forwards;
+  z-index:10;line-height:1.3;
 }
-@keyframes chess-crown-bounce{
-  0%,100%{transform:translateY(0) rotate(0deg);}
-  30%{transform:translateY(-10px) rotate(-5deg);}
-  60%{transform:translateY(-5px) rotate(3deg);}
-}
-@keyframes chess-loser-shake{
-  0%,100%{transform:rotate(0);}
-  20%{transform:rotate(-10deg);}
-  40%{transform:rotate(10deg);}
-  60%{transform:rotate(-6deg);}
-  80%{transform:rotate(6deg);}
-}
-.chess-result-card{
-  background:var(--surface);border-radius:var(--r12);
-  padding:20px 28px;display:flex;flex-direction:column;
-  align-items:center;gap:14px;
-  box-shadow:0 8px 40px rgba(0,0,0,.45);
-  animation:chess-card-in .45s cubic-bezier(.34,1.56,.64,1) forwards;
-  min-width:260px;
-}
-.chess-result-players{display:flex;align-items:center;gap:20px;}
-.chess-result-player{display:flex;flex-direction:column;align-items:center;gap:6px;}
-.chess-result-avatar{
-  width:60px;height:60px;border-radius:50%;
-  display:flex;align-items:center;justify-content:center;
-  font-size:34px;border:3px solid var(--border2);
-}
-.white-avatar{background:#f0d9b5;}
-.black-avatar{background:#b58863;}
-.chess-result-icon{font-size:24px;line-height:1;}
-.winner-icon{animation:chess-crown-bounce .8s ease .5s 3;}
-.loser-icon{animation:chess-loser-shake .5s ease .3s 1;}
-.chess-result-label{font-size:11px;font-weight:600;letter-spacing:.6px;color:var(--text3);text-transform:uppercase;}
-#chess-result-winner .chess-result-avatar{border-color:#f9ab00;box-shadow:0 0 16px rgba(249,171,0,.45);}
-#chess-result-loser .chess-result-avatar{border-color:var(--red);opacity:.8;}
-.chess-result-vs{font-size:13px;color:var(--text3);font-weight:500;align-self:center;}
-.chess-result-msg{font-size:16px;font-weight:600;color:var(--text);text-align:center;}
+.csq-winner-badge{background:#4caf50;color:#fff;}
+.csq-loser-badge{background:#ef5350;color:#fff;}
 /* PAWN PROMOTION PICKER */
 #promo-overlay{
   position:absolute;inset:0;background:rgba(0,0,0,.65);
@@ -1079,37 +1045,8 @@ body.touch .sdc{width:38px;height:38px;font-size:15px;}
     </div>
     <div id="chess-board-wrap" style="position:relative;display:inline-block;">
       <div id="chess-board"></div>
-      <div id="chess-result-overlay">
-        <div class="chess-result-card" id="chess-result-card">
-          <div class="chess-result-players">
-            <div class="chess-result-player" id="chess-result-winner">
-              <div class="chess-result-avatar" id="chess-result-winner-avatar"></div>
-              <div class="chess-result-icon winner-icon">👑</div>
-              <div class="chess-result-label" id="chess-result-winner-label">Winner!</div>
-            </div>
-            <div class="chess-result-vs">vs</div>
-            <div class="chess-result-player" id="chess-result-loser">
-              <div class="chess-result-avatar" id="chess-result-loser-avatar"></div>
-              <div class="chess-result-icon loser-icon">♟</div>
-              <div class="chess-result-label" id="chess-result-loser-label">Checkmate</div>
-            </div>
-          </div>
-          <div class="chess-result-msg" id="chess-result-msg"></div>
-          <button class="btn y" onclick="chessInit()" style="margin-top:4px;">↺ Play Again</button>
-        </div>
-      </div>
     </div>
-    <div id="promo-overlay">
-      <div class="promo-box">
-        <p>Promote pawn to:</p>
-        <div class="promo-pieces">
-          <div class="promo-piece" id="promo-Q" onclick="choosePromo('Q')" title="Queen"></div>
-          <div class="promo-piece" id="promo-R" onclick="choosePromo('R')" title="Rook"></div>
-          <div class="promo-piece" id="promo-B" onclick="choosePromo('B')" title="Bishop"></div>
-          <div class="promo-piece" id="promo-N" onclick="choosePromo('N')" title="Knight"></div>
-        </div>
-      </div>
-    </div>
+
     <div style="display:flex;gap:6px;margin-top:6px">
       <button class="btn" onclick="chessInit()">↺ New game</button>
       <button class="btn" onclick="chessUndo()">⟵ Undo</button>
@@ -1129,6 +1066,7 @@ body.touch .sdc{width:38px;height:38px;font-size:15px;}
         <button id="bvb-b-med" class="chip on" onclick="setBvbDiff('b','med')">Medium</button>
         <button id="bvb-b-hard" class="chip" onclick="setBvbDiff('b','hard')">Hard 🧠</button>
       </div>
+      <button class="btn" id="bvb-skip-btn" onclick="bvbSkipToEnd()" style="margin-top:2px;">⏭ Skip to End</button>
     </div>
     <div class="hint" id="chess-hint">You are White · Bot is Black</div>
   </div>
@@ -2167,8 +2105,10 @@ function filterGames(q){
     // Show BvB difficulty controls only in bvb mode
     const bvbCtrl=document.getElementById('bvb-controls');
     if(bvbCtrl)bvbCtrl.style.display=gameMode==='bvb'?'flex':'none';
-    const ro=document.getElementById('chess-result-overlay');
-    if(ro)ro.classList.remove('show');
+    const rp=document.getElementById('chess-result-panel');
+    if(rp)rp.classList.remove('show');
+    // clear result badges
+    document.querySelectorAll('.csq-winner-badge,.csq-loser-badge').forEach(e=>e.remove());
     render();
     const hints={'pvb-easy':'You are White · Bot is Medium difficulty','pvb-hard':'You are White · Bot is Hard difficulty','pvp':'White moves first · Pass the device after each move','bvb':'Watch the bots battle!'};
     const h=document.getElementById('chess-hint');if(h)h.textContent=hints[gameMode]||'';
@@ -2340,66 +2280,80 @@ function filterGames(q){
     handleClick(idx,w);
   }
 
-  function showChessResult(end){
+
+  function showChessResult(end,loserIsWhite){
     const isCheckmate=end.includes('Checkmate');
-    const whiteWins=end.includes('White wins');
-    const ov=document.getElementById('chess-result-overlay');
-    if(!ov)return;
+    const whiteWins=!loserIsWhite&&isCheckmate;
 
-    // Determine winner/loser colors
-    const winnerWhite=isCheckmate?whiteWins:null; // null = draw
-    const winnerAvatar=document.getElementById('chess-result-winner-avatar');
-    const loserAvatar=document.getElementById('chess-result-loser-avatar');
-    const msg=document.getElementById('chess-result-msg');
-    const winnerLabel=document.getElementById('chess-result-winner-label');
-    const loserLabel=document.getElementById('chess-result-loser-label');
-    const loserIcon=document.querySelector('.loser-icon');
-    const winnerIcon=document.querySelector('.winner-icon');
+    const panel=document.getElementById('chess-result-panel');
+    if(!panel)return;
 
-    if(isCheckmate){
-      // Show piece icons using Lichess URLs
-      const wColor=winnerWhite?'w':'b';
-      const lColor=winnerWhite?'b':'w';
-      winnerAvatar.innerHTML=`<img src="https://lichess1.org/assets/piece/cburnett/${wColor}K.svg" style="width:80%;height:80%"/>`;
-      loserAvatar.innerHTML=`<img src="https://lichess1.org/assets/piece/cburnett/${lColor}K.svg" style="width:80%;height:80%"/>`;
-      winnerAvatar.className=`chess-result-avatar ${winnerWhite?'white-avatar':'black-avatar'}`;
-      loserAvatar.className=`chess-result-avatar ${winnerWhite?'black-avatar':'white-avatar'}`;
-      winnerIcon.textContent='👑';
-      loserIcon.textContent='♟';
-      winnerLabel.textContent='Winner!';
-      loserLabel.textContent='Checkmate';
+    const modeNames={'pvb-easy':['You','Bot'],'pvb-hard':['You','Bot'],'pvp':['White','Black'],'bvb':['White Bot','Black Bot']};
+    const [wName,bName]=modeNames[gameMode]||['White','Black'];
 
-      // Player/bot names based on mode
-      const names={
-        'pvb-easy':winnerWhite?['You','Bot']:['Bot','You'],
-        'pvb-hard':winnerWhite?['You','Bot']:['Bot','You'],
-        'pvp':winnerWhite?['White','Black']:['Black','White'],
-        'bvb':winnerWhite?['White Bot','Black Bot']:['Black Bot','White Bot'],
-      };
-      const [wName,lName]=(names[gameMode]||['White','Black']);
-      msg.textContent=`${wName} checkmated ${lName}!`;
-    } else {
-      // Stalemate / draw
-      winnerAvatar.innerHTML='🤝';
-      loserAvatar.innerHTML='🤝';
-      winnerAvatar.className='chess-result-avatar';
-      loserAvatar.className='chess-result-avatar';
-      winnerIcon.textContent='';loserIcon.textContent='';
-      winnerLabel.textContent='Draw';loserLabel.textContent='Draw';
-      msg.textContent='Stalemate — No legal moves!';
+    // Count captured pieces for material advantage
+    const PVALS={p:1,n:3,b:3,r:5,q:9};
+    const start={p:8,n:2,b:2,r:2,q:1};
+    const wCount={},bCount={};
+    board.forEach(p=>{if(!p||p.toLowerCase()==='k')return;if(isW(p))wCount[p.toLowerCase()]=(wCount[p.toLowerCase()]||0)+1;else bCount[p.toLowerCase()]=(bCount[p.toLowerCase()]||0)+1;});
+    const wCaps=[],bCaps=[];
+    let wAdv=0,bAdv=0;
+    Object.entries(start).forEach(([pt,n])=>{
+      const wMiss=n-(bCount[pt]||0);const bMiss=n-(wCount[pt]||0);
+      for(let i=0;i<wMiss;i++)wCaps.push(pt);
+      for(let i=0;i<bMiss;i++)bCaps.push(pt);
+      wAdv+=wMiss*PVALS[pt];bAdv+=bMiss*PVALS[pt];
+    });
+    const netAdv=wAdv-bAdv;
+
+    function capsHTML(caps,color){
+      return caps.sort((a,b)=>PVALS[b]-PVALS[a]).map(p=>`<img src="https://lichess1.org/assets/piece/cburnett/${color}${p.toUpperCase()}.svg"/>`).join('');
     }
 
-    // Hide the players row for stalemate, show for checkmate
-    document.getElementById('chess-result-card').querySelector('.chess-result-players').style.display=
-      isCheckmate?'flex':'none';
+    if(isCheckmate){
+      const wc=whiteWins?'w':'b',lc=whiteWins?'b':'w';
+      const winName=whiteWins?wName:bName,loseName=whiteWins?bName:wName;
+      const winCaps=whiteWins?wCaps:bCaps,losCaps=whiteWins?bCaps:wCaps;
+      const winAdv=whiteWins?Math.max(0,netAdv):Math.max(0,-netAdv);
 
-    // Reset animation by re-inserting card
-    const card=document.getElementById('chess-result-card');
-    card.style.animation='none';
-    void card.offsetWidth;
-    card.style.animation='';
+      document.getElementById('cr-winner-avatar').innerHTML=`<img src="https://lichess1.org/assets/piece/cburnett/${wc}K.svg"/>`;
+      document.getElementById('cr-loser-avatar').innerHTML=`<img src="https://lichess1.org/assets/piece/cburnett/${lc}K.svg"/>`;
+      document.getElementById('cr-winner-name').textContent=winName;
+      document.getElementById('cr-loser-name').textContent=loseName;
+      document.getElementById('cr-winner-caps').innerHTML=capsHTML(winCaps,lc);
+      document.getElementById('cr-loser-caps').innerHTML=capsHTML(losCaps,wc);
+      document.getElementById('cr-winner-score').textContent=winAdv>0?`+${winAdv}`:'';
+      document.getElementById('cr-loser-score').textContent='';
+      document.getElementById('cr-banner-text').textContent='Checkmate';
+      document.querySelector('.cr-loser').style.background='rgba(239,83,80,.07)';
+      document.querySelector('.cr-winner').style.background='rgba(102,187,106,.07)';
+      document.querySelector('.cr-badge-win').textContent='👑';
+      document.querySelector('.cr-badge-lose').textContent='✕';
+    } else {
+      document.getElementById('cr-winner-avatar').innerHTML=`<img src="https://lichess1.org/assets/piece/cburnett/wK.svg"/>`;
+      document.getElementById('cr-loser-avatar').innerHTML=`<img src="https://lichess1.org/assets/piece/cburnett/bK.svg"/>`;
+      document.getElementById('cr-winner-name').textContent=wName;
+      document.getElementById('cr-loser-name').textContent=bName;
+      document.getElementById('cr-winner-caps').innerHTML='';
+      document.getElementById('cr-loser-caps').innerHTML='';
+      document.getElementById('cr-winner-score').textContent='½';
+      document.getElementById('cr-loser-score').textContent='½';
+      document.getElementById('cr-banner-text').textContent='Stalemate — Draw';
+      document.querySelector('.cr-loser').style.background='';
+      document.querySelector('.cr-winner').style.background='';
+      document.querySelector('.cr-badge-win').textContent='½';
+      document.querySelector('.cr-badge-lose').textContent='½';
+    }
 
-    ov.classList.add('show');
+    // Re-trigger badge animations
+    ['.cr-badge-win','.cr-badge-lose'].forEach(sel=>{
+      const el=document.querySelector(sel);
+      if(el){el.style.animation='none';void el.offsetWidth;el.style.animation='';}
+    });
+
+    panel.style.animation='none';void panel.offsetWidth;panel.style.animation='';
+    panel.classList.add('show');
+    setTimeout(()=>panel.scrollIntoView({behavior:'smooth',block:'nearest'}),100);
   }
 
   function afterMove(){
@@ -2408,7 +2362,7 @@ function filterGames(q){
     const end=checkEnd(board,nextWhite,enPassant,castleRights);
     if(end&&(end.includes('Checkmate')||end.includes('Stalemate'))){
       turn='done';render();setSt(end);
-      setTimeout(()=>showChessResult(end), 600);
+      setTimeout(()=>showChessResult(end,nextWhite),700);
       const pvb=gameMode==='pvb-easy'||gameMode==='pvb-hard';
       gameLog('Chess',pvb&&end.includes('White wins')?'Win':end.includes('Stalemate')?'Draw':'Loss',end);
       return;
@@ -2565,6 +2519,77 @@ function filterGames(q){
     if(!isInCheck(b,nextWhite))return'';
     return hasLegalMoves(b,nextWhite,ep,cr)?'+':'#';
   }
+
+  window.bvbSkipToEnd=function(){
+    if(gameMode!=='bvb'||turn==='done')return;
+    clearTimeout(bvbTimer);
+
+    // Disable skip button while running
+    const btn=document.getElementById('bvb-skip-btn');
+    if(btn){btn.disabled=true;btn.textContent='⏳ Computing...';}
+
+    // Run in a setTimeout so UI can update first
+    setTimeout(()=>{
+      let safety=0;
+      while(turn!=='done'&&safety++<500){
+        const maxBlack=turn==='b';
+        const diff=getDiff();
+        let bf=-1,bt=-1;
+
+        if(diff==='hard'||diff==='med'){
+          const depth=diff==='hard'?3:2;
+          const res=minimax(board,depth,-Infinity,Infinity,maxBlack,enPassant,castleRights);
+          if(res.move){bf=res.move.fr;bt=res.move.to;}
+        } else {
+          // Easy greedy
+          let best=-9999;
+          for(let i=0;i<64;i++){
+            const p=board[i];if(!p||(maxBlack?!isB(p):!isW(p)))continue;
+            getLegalMoves(board,i,enPassant,castleRights).forEach(to=>{
+              let sc=(board[to]?VALS[board[to].toLowerCase()]:0)+Math.random()*120;
+              if(sc>best){best=sc;bf=i;bt=to;}
+            });
+          }
+        }
+
+        if(bf<0){turn='done';break;}
+
+        // Apply move silently
+        const sanBase=buildSAN(board,bf,bt,enPassant,castleRights);
+        hist.push({b:[...board],t:turn,ep:enPassant,cr:{...castleRights}});
+        const{nb,newEp,newCr}=applyMove(board,bf,bt,castleRights,enPassant);
+        board=[...nb];enPassant=newEp;castleRights=newCr;
+        if(board[bt]==='p'&&Math.floor(bt/8)===7)board[bt]='q';
+        if(board[bt]==='P'&&Math.floor(bt/8)===0)board[bt]='Q';
+        const san=sanBase+annotateSAN(board,turn!=='b',newEp,newCr);
+        pgnMoves.push(san);
+
+        const nextWhite=turn!=='w';
+        const end=checkEnd(board,nextWhite,enPassant,castleRights);
+        if(end&&(end.includes('Checkmate')||end.includes('Stalemate'))){
+          turn='done';
+          render();
+          setSt(end);
+          setTimeout(()=>showChessResult(end),400);
+          gameLog('Chess','Info',end);
+          if(btn){btn.disabled=false;btn.textContent='⏭ Skip to End';}
+          return;
+        }
+        turn=turn==='w'?'b':'w';
+      }
+
+      // Render final state
+      render();
+      if(turn==='done'){
+        const end=checkEnd(board,false,enPassant,castleRights)||checkEnd(board,true,enPassant,castleRights)||'Game over';
+        setSt(end);
+        setTimeout(()=>showChessResult(end),400);
+      } else {
+        setSt('Game ended (move limit reached)');
+      }
+      if(btn){btn.disabled=false;btn.textContent='⏭ Skip to End';}
+    },50);
+  };
 
   window.setBvbDiff=function(side,diff){
     bvbDiff[side]=diff;
