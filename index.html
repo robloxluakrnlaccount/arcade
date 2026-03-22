@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>Arcade Hub</title>
+<title>Arcade Hub — 30 Games</title>
 
 <!-- ── PWA / HOME SCREEN ICONS ───────────────────────── -->
 <!-- Favicon -->
@@ -2901,7 +2901,7 @@ function filterGames(q){
           if(isWinnerSq){
             sqIcon.innerHTML=`<svg viewBox="0 0 20 14" width="36" height="26" xmlns="http://www.w3.org/2000/svg"><polygon points="0,14 0,4 5,8 10,0 15,8 20,4 20,14" fill="#fff"/><rect x="0" y="13" width="20" height="2" fill="#fff" rx="1"/></svg>`;
           } else {
-            sqIcon.innerHTML=`<img src="https://lichess1.org/assets/piece/cburnett/${loserColor}K.svg" style="width:80%;height:80%;transform:rotate(-90deg);display:block;"/>`;
+            sqIcon.innerHTML=`<img src="https://lichess1.org/assets/piece/cburnett/bK.svg" style="width:80%;height:80%;transform:rotate(-90deg);display:block;filter:brightness(0)"/>`;
           }
           d.appendChild(sqIcon);
 
@@ -2924,7 +2924,8 @@ function filterGames(q){
             iconWrap.appendChild(c);
           } else {
             const img=document.createElement('img');
-            img.src=`https://lichess1.org/assets/piece/cburnett/${loserColor}K.svg`;
+            img.src=`https://lichess1.org/assets/piece/cburnett/bK.svg`;
+            img.style.filter='brightness(0)';
             img.className='fallen';iconWrap.appendChild(img);
           }
           pill.appendChild(iconWrap);
