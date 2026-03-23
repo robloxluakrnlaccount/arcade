@@ -1122,6 +1122,17 @@ body.touch .sdc{width:38px;height:38px;font-size:15px;}
     </div>
     <div id="chess-board-wrap" style="position:relative;display:inline-block;">
       <div id="chess-board"></div>
+      <div id="promo-overlay">
+        <div class="promo-box">
+          <p>Promote pawn to:</p>
+          <div class="promo-pieces">
+            <div class="promo-piece" id="promo-Q" onclick="choosePromo('Q')" title="Queen"></div>
+            <div class="promo-piece" id="promo-R" onclick="choosePromo('R')" title="Rook"></div>
+            <div class="promo-piece" id="promo-B" onclick="choosePromo('B')" title="Bishop"></div>
+            <div class="promo-piece" id="promo-N" onclick="choosePromo('N')" title="Knight"></div>
+          </div>
+        </div>
+      </div>
     </div>
     <div style="display:flex;gap:6px;margin-top:6px">
       <button class="btn" onclick="chessInit()">↺ New game</button>
